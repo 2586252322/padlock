@@ -129,6 +129,10 @@ export class Org extends SharedContainer implements Storable {
         return super.fromRaw(rest);
     }
 
+    isOwner({ id }: { id: string }) {
+        return id === this.owner;
+    }
+
     isAdmin(m: { id: string }) {
         return !!this.admins.isMember(m);
     }
@@ -224,6 +228,32 @@ export class Org extends SharedContainer implements Storable {
         );
     }
 
+    async rotateKeys(force = false) {
+        if (!force) {
+            // Verify members and groups with current public key
+            await this.verifyAll();
+        }
+
+        // Rotate all group keys
+        await Promise.all(
+            [this.admins, this.everyone, ...this.groups].map(async group => {
+                delete group.encryptedData;
+                await group.updateAccessors(this.getMembersForGroup(group));
+                await group.generateKeys();
+            })
+        );
+
+        // Rotate org encryption key
+        delete this.encryptedData;
+        await this.updateAccessors([this.admins]);
+
+        // Rotate Org key pair
+        await this.generateKeys();
+
+        // Resign groups and members
+        await Promise.all([this.admins, this.everyone, ...this.groups, ...this.members].map(each => this.sign(each)));
+    }
+
     async unlock(account: Account) {
         await this.admins.unlock(account);
         await super.unlock(this.admins);
@@ -231,6 +261,21 @@ export class Org extends SharedContainer implements Storable {
             const { privateKey, invitesKey } = unmarshal(bytesToString(await this.getData()));
             this.privateKey = base64ToBytes(privateKey);
             this.invitesKey = base64ToBytes(invitesKey);
+            await this.verifySelf();
+        }
+    }
+
+    async verifySelf() {
+        if (!this.privateKey) {
+            throw "Organisation needs to be unlocked first.";
+        }
+
+        const val = await getProvider().randomBytes(16);
+        const sig = await getProvider().sign(this.privateKey, val, this.signingParams);
+        const verified = await getProvider().verify(this.publicKey, sig, val, this.signingParams);
+
+        if (!verified) {
+            throw new Err(ErrorCode.PUBLIC_KEY_MISMATCH, "Failed to verify own public key.");
         }
     }
 
@@ -243,34 +288,28 @@ export class Org extends SharedContainer implements Storable {
         return obj;
     }
 
-    async verify(obj: OrgMember | Group): Promise<boolean> {
-        let verified = false;
+    async verify(obj: OrgMember | Group): Promise<void> {
         if (!obj.signedPublicKey) {
-            return false;
+            throw new Err(ErrorCode.PUBLIC_KEY_MISMATCH, "No signed public key provided!");
         }
-        try {
-            verified = await getProvider().verify(
-                this.publicKey,
-                obj.signedPublicKey,
-                obj.publicKey,
-                this.signingParams
-            );
-        } catch (e) {}
-        return verified;
+
+        const verified = await getProvider().verify(
+            this.publicKey,
+            obj.signedPublicKey,
+            obj.publicKey,
+            this.signingParams
+        );
+
+        if (!verified) {
+            throw new Err(ErrorCode.PUBLIC_KEY_MISMATCH, `Failed to verify public key of ${obj.name}!`);
+        }
     }
 
-    async verifyAll() {
+    async verifyAll(
+        subjects: Array<OrgMember | Group> = [this.admins, this.everyone, ...this.groups, ...this.members]
+    ) {
         // Verify public keys for members and groups
-        await Promise.all(
-            [...this.members, ...this.groups].map(async (obj: OrgMember) => {
-                if (!(await this.verify(obj))) {
-                    throw new Err(
-                        ErrorCode.PUBLIC_KEY_MISMATCH,
-                        `Failed to verify public key for member org group: ${obj.name}.`
-                    );
-                }
-            })
-        );
+        await Promise.all(subjects.map(async obj => this.verify(obj)));
     }
 
     async addMember({
@@ -285,22 +324,65 @@ export class Org extends SharedContainer implements Storable {
         publicKey: Uint8Array;
     }) {
         if (!this.privateKey) {
-            throw new Err(ErrorCode.INSUFFICIENT_PERMISSIONS);
+            throw "Organisation needs to be unlocked first.";
         }
 
         const member = await this.sign(new OrgMember({ id, name, email, publicKey }));
         this.members.push(member);
-        await this.everyone.unlock(this.admins);
-        await this.everyone.updateAccessors([this.admins, ...this.members]);
     }
 
     async createGroup(name: string, members: OrgMember[] = []) {
+        if (!this.privateKey) {
+            throw "Organisation needs to be unlocked first.";
+        }
+
         const group = new Group();
         group.id = uuid();
         group.name = name;
-        await group.updateAccessors([this.admins, ...members]);
+
+        // Verify public keys first
+        await this.verifyAll(members);
+        await group.updateAccessors(members);
         await group.generateKeys();
         this.groups.push(await this.sign(group));
         return group;
+    }
+
+    async updateGroup(id: GroupID, members: OrgMember[] = [], name?: string) {
+        if (!this.privateKey) {
+            throw "Organisation needs to be unlocked first.";
+        }
+
+        const group = this.getGroup(id);
+
+        if (!group) {
+            throw "Group does not exist!";
+        }
+
+        if (name) {
+            group.name = name;
+        }
+
+        // Make sure org owner is in admin group
+        if (group === this.admins && !members.some(m => m.id === this.owner)) {
+            members.push(this.getMember({ id: this.owner })!);
+        }
+
+        await this.verifyAll(members);
+
+        // Update group accessors
+        delete group.encryptedData;
+        await group.updateAccessors(members);
+
+        // Rotate key pair
+        await group.generateKeys();
+
+        // Re-sign group
+        await this.sign(group);
+
+        if (group === this.admins) {
+            // Rotate org encryption key
+            await this.updateAccessors([this.admins]);
+        }
     }
 }

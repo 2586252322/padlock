@@ -171,6 +171,9 @@ export class Invite extends SharedContainer {
     }
 
     async unlock(org: Org) {
+        if (!org.privateKey) {
+            throw "Org must be unlocked first!";
+        }
         await super.unlock(org.admins);
         const { secret, expires } = unmarshal(bytesToString(await this.getData()));
         this.secret = secret;

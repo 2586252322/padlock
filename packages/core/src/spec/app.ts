@@ -80,7 +80,10 @@ export function appSpec(): Spec {
 
         test("Create Vault", async () => {
             const name = "My Shared Vault";
-            const vault = await app.createVault(name, app.orgs[0], [app.orgs[0].everyone]);
+            const vault = await app.createVault(name, app.orgs[0], [
+                { id: app.orgs[0].admins.id, readonly: false },
+                { id: app.orgs[0].everyone.id, readonly: false }
+            ]);
             assert.equal(vault.name, name);
             assert.equal(app.vaults.length, 2);
         });
@@ -118,13 +121,13 @@ export function appSpec(): Spec {
 
         test("Create Group", async () => {
             const org = app.orgs[0];
-            const { id } = await app.createGroup(org, "Some Group", org.members);
+            const { id } = await app.createGroup(org, "Some Group", org.members)!;
             const group = app.orgs[0].getGroup(id)!;
             assert.ok(group);
             assert.isTrue(group.isMember(app.account!));
             assert.isTrue(group.isMember(otherApp.account!));
 
-            await app.createVault("Another Vault", app.orgs[0], [group]);
+            await app.createVault("Another Vault", app.orgs[0], [{ id: group.id, readonly: false }]);
             await otherApp.synchronize();
             assert.equal(otherApp.vaults.length, 3);
         });

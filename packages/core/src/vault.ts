@@ -63,6 +63,7 @@ export class Vault extends SharedContainer implements Storable {
 
     merge(vault: Vault) {
         this.items.merge(vault.items);
+        this.name = vault.name;
         this.revision = this.items.revision;
     }
 
