@@ -39,7 +39,6 @@ export class TagsInput extends BaseElement {
             <style>
                 :host {
                     display: block;
-                    background: var(--color-tertiary);
                     position: relative;
                     z-index: 1;
                     overflow: visible;
@@ -50,6 +49,7 @@ export class TagsInput extends BaseElement {
                 .wrapper {
                     flex-wrap: wrap;
                     overflow: visible;
+                    margin-top: -6px;
                 }
 
                 .wrapper > * {
@@ -66,6 +66,7 @@ export class TagsInput extends BaseElement {
                 }
 
                 .results .tag {
+                    padding: 6px 8px;
                     margin-top: 6px;
                 }
 
@@ -106,34 +107,26 @@ export class TagsInput extends BaseElement {
             </style>
 
             <div class="tags small wrapper">
-
                 <div class="tag highlight tap" @click=${() => this._vaultClicked()}>
-
                     <pl-icon icon="vault"></pl-icon>
 
                     <div class="tag-name">${vault}</div>
-
                 </div>
 
                 ${tags.map(
                     tag => html`
+                        <div class="tag tap" @click=${() => this._tagClicked(tag)}>
+                            <pl-icon icon="tag"></pl-icon>
 
-                    <div class="tag tap" @click=${() => this._tagClicked(tag)}>
+                            <div>${tag}</div>
 
-                        <pl-icon icon="tag"></pl-icon>
-
-                        <div>${tag}</div>
-
-                        <pl-icon icon="cancel" ?hidden=${!editing}></pl-icon>
-
-                    </div>
-                `
+                            <pl-icon icon="cancel" ?hidden=${!editing}></pl-icon>
+                        </div>
+                    `
                 )}
 
                 <div class="add-tag" ?hidden=${!editing}>
-
                     <div class="input-wrapper tap" @click=${() => this._input.focus()}>
-
                         <pl-icon icon="add"></pl-icon>
 
                         <pl-input
@@ -141,27 +134,23 @@ export class TagsInput extends BaseElement {
                             @enter=${() => this._addTag(value)}
                             @input=${() => this.requestUpdate()}
                             @focus=${() => this._focusChanged()}
-                            @blur=${() => this._focusChanged()}>
+                            @blur=${() => this._focusChanged()}
+                        >
                         </pl-input>
-
                     </div>
 
                     <div class="tags tap small results" ?hidden=${!_showResults}>
                         ${results.map(
                             res => html`
-                            <div class="tag tap" @click=${() => this._addTag(res)}>
+                                <div class="tag tap" @click=${() => this._addTag(res)}>
+                                    <pl-icon icon="tag"></pl-icon>
 
-                                <pl-icon icon="tag"></pl-icon>
-
-                                <div>${res}</div>
-
-                            </div>
-                        `
+                                    <div>${res}</div>
+                                </div>
+                            `
                         )}
                     </div>
-
                 </div>
-
             </div>
         `;
     }

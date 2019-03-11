@@ -6,7 +6,7 @@ export const wideWidth = 1200;
 export const cssVars = html`
     <style>
         :host {
-            --font-family: "Clear Sans";
+            --font-family: "Nunito";
             --font-family-fallback: sans-serif;
             --font-family-mono: "Inconsolata";
 
@@ -23,11 +23,17 @@ export const cssVars = html`
             --color-secondary: #444;
             --color-tertiary: #ffffff;
             --color-quaternary: #fafafa;
+            --color-negative: #D7322D;
 
             --color-background: var(--color-tertiary);
             --color-foreground: var(--color-secondary);
             --color-highlight: var(--color-primary);
-            --color-error: #D7322D;
+            --color-error: var(--color-negative);
+
+            --color-shade-1: rgba(0, 0, 0, 0.05);
+            --color-shade-2: rgba(0, 0, 0, 0.1);
+            --color-shade-3: rgba(0, 0, 0, 0.15);
+            --color-shade-4: rgba(0, 0, 0, 0.2);
 
             --color-gradient-highlight-from: rgb(7, 124, 185);
             --color-gradient-highlight-to: rgb(89, 198, 255);
@@ -38,19 +44,22 @@ export const cssVars = html`
 
             --color-scrim: rgba(255, 255, 255, 0.9);
 
+            --color-btn-front: var(--color-foreground);
+            --color-btn-back: var(--shade-3-color);
+
             --row-height: 50px;
 
-            --gutter-size: 4px;
+            --gutter-size: 8px;
             --border-radius: 8px;
             --border-color: rgba(0, 0, 0, 0.1);
 
             --toaster-easing: cubic-bezier(1, -0.3, 0, 1.3);
 
             --shade-1-color: transparent;
-            --shade-2-color: rgba(0, 0, 0, 0.05);
-            --shade-3-color: rgba(0, 0, 0, 0.1);
-            --shade-4-color: rgba(0, 0, 0, 0.15);
-            --shade-5-color: rgba(0, 0, 0, 0.2);
+            --shade-2-color: var(--color-shade-1);
+            --shade-3-color: var(--color-shade-2);
+            --shade-4-color: var(--color-shade-3);
+            --shade-5-color: var(--color-shade-4);
         }
     </style>
 `;

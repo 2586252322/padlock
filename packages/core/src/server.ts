@@ -424,12 +424,9 @@ export class Context implements API {
         promises.push(this.attachmentStorage.deleteAll(vault));
 
         // Remove vault from org
-        let i = org.vaults.findIndex(v => v.id === id);
-        org.vaults.splice(i, 1);
-
+        org.vaults = org.vaults.filter(v => v.id === vault.id);
         for (const group of org.getGroupsForVault(vault)) {
-            const i = group.vaults.findIndex(v => v.id === id);
-            group.vaults.splice(i, 1);
+            group.vaults = group.vaults.filter(v => v.id === vault.id);
         }
 
         promises.push(this.storage.save(org));

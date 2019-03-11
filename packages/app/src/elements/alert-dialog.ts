@@ -39,56 +39,56 @@ export class AlertDialog extends Dialog<AlertOptions, number> {
     renderContent() {
         const { message, dialogTitle, options, icon } = this;
         return html`
-        ${shared}
+            ${shared}
 
-        <style>
-            :host([type="warning"]) .inner {
-                ${mixins.gradientWarning()}
-            }
+            <style>
+                :host([type="warning"]) .inner {
+                    ${mixins.gradientWarning()}
+                }
 
-            :host([type="plain"]) .inner {
-                background: var(--color-background);
-            }
+                :host([type="plain"]) .inner {
+                    background: var(--color-background);
+                }
 
-            :host([hide-icon]) .info-icon {
-                display: none;
-            }
+                :host([hide-icon]) .info-icon {
+                    display: none;
+                }
 
-            :host([hide-icon]) .info-text,
-            :host([hide-icon]) .info-title {
-                text-align: center;
-            }
+                :host([hide-icon]) .info-text,
+                :host([hide-icon]) .info-title {
+                    text-align: center;
+                }
 
-            .buttons {
-                display: flex;
-                flex-direction: column;
-            }
+                :host([horizontal]) .buttons {
+                    flex-direction: row;
+                }
 
-            :host([horizontal]) .buttons {
-                flex-direction: row;
-            }
+                :host([horizontal]) button {
+                    flex: 1;
+                }
 
-            :host([horizontal]) button {
-                flex: 1;
-            }
+                .info-text:not(.small) {
+                    font-size: var(--font-size-default);
+                }
+            </style>
 
-            .info-text:not(.small) {
-                font-size: var(--font-size-default);
-            }
-        </style>
-
-        <div class="info" ?hidden=${!dialogTitle && !message}>
-            <pl-icon class="info-icon" icon="${icon}"></pl-icon>
-            <div class="info-body">
-                <div class="info-title">${dialogTitle}</div>
-                <div class="info-text ${this.dialogTitle ? "small" : ""}">${message}</div>
+            <div class="info" ?hidden=${!dialogTitle && !message}>
+                <pl-icon class="info-icon" icon="${icon}"></pl-icon>
+                <div class="info-body">
+                    <div class="info-title">${dialogTitle}</div>
+                    <div class="info-text ${this.dialogTitle ? "small" : ""}">${message}</div>
+                </div>
             </div>
-        </div>
 
-        <div class="buttons tiles tiles-2">
-            ${options.map((o: any, i: number) => html`<button class="tap" @click=${() => this.done(i)}>${o}</button>`)}
-        </div>
-`;
+            <div class="actions">
+                ${options.map(
+                    (o: any, i: number) =>
+                        html`
+                            <button class="tap" @click=${() => this.done(i)}>${o}</button>
+                        `
+                )}
+            </div>
+        `;
     }
 
     done(i: number = -1) {

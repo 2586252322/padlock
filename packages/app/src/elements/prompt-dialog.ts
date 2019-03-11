@@ -53,90 +53,66 @@ export class PromptDialog extends Dialog<PromptOptions, string | null> {
 
     renderContent() {
         return html`
-        <style>
-            :host([type="warning"]) .inner {
-                ${mixins.gradientWarning()}
-            }
+            <style>
+                :host([type="warning"]) .inner {
+                    ${mixins.gradientWarning()}
+                }
 
-            h1 {
-                display: block;
-                text-align: center;
-            }
+                h1 {
+                    display: block;
+                    text-align: center;
+                }
 
-            .message {
-                margin: 20px;
-                text-align: center;
-            }
+                .message {
+                    margin: 20px;
+                    text-align: center;
+                }
 
-            pl-input, pl-loading-button, button {
-                text-align: center;
-                background: var(--shade-2-color);
-                border-radius: 8px;
-            }
+                pl-input {
+                    text-align: center;
+                    margin: 10px;
+                }
 
-            pl-input {
-                margin: 10px;
-            }
+                .validation-message {
+                    position: relative;
+                    margin-top: 15px;
+                    font-weight: bold;
+                    font-size: var(--font-size-small);
+                    color: var(--color-error);
+                    text-shadow: none;
+                    text-align: center;
+                }
+            </style>
 
-            .buttons {
-                margin: 10px;
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                grid-gap: 8px;
-            }
+            <h1 ?hidden=${!this.title}>${this.title}</h1>
 
-            .confirm {
-                font-weight: bold;
-                background: var(--shade-4-color);
-            }
+            <div class="message" ?hidden=${!this.message}>${this.message}</div>
 
-            .cancel {
-                background: var(--shade-3-color);
-                margin-left: 0;
-            }
+            <pl-input
+                class="tap"
+                .type=${this.type}
+                .placeholder=${this.placeholder}
+                .label=${this.label}
+                @enter=${() => this._confirmButton.click()}
+            >
+            </pl-input>
 
-            .validation-message {
-                position: relative;
-                margin-top: 15px;
-                font-weight: bold;
-                font-size: var(--font-size-small);
-                color: var(--color-error);
-                text-shadow: none;
-                text-align: center;
-            }
-        </style>
+            <div class="actions">
+                <pl-loading-button id="confirmButton" class="tap primary" @click=${() => this._confirm()}>
+                    ${this.confirmLabel}
+                </pl-loading-button>
 
-        <h1 ?hidden=${!this.title}>${this.title}</h1>
-
-        <div class="message" ?hidden=${!this.message}>${this.message}</div>
-
-        <pl-input
-            class="tap"
-            .type=${this.type}
-            .placeholder=${this.placeholder}
-            .label=${this.label}
-            @enter=${() => this._confirmButton.click()}>
-        </pl-input>
-
-        <div class="buttons">
-
-            <pl-loading-button
-                id="confirmButton"
-                class="tap confirm"
-                @click=${() => this._confirm()}>
-                ${this.confirmLabel}
-            </pl-loading-button>
-
-            <button class="tap cancel" @click=${() => this.done(null)} ?hidden=${!this.cancelLabel}>
-                ${this.cancelLabel}
-            </button>
-
-        </div>
-`;
+                <button class="tap" @click=${() => this.done(null)} ?hidden=${!this.cancelLabel}>
+                    ${this.cancelLabel}
+                </button>
+            </div>
+        `;
     }
 
     renderAfter() {
-        return html`<div class="validation-message" slot="after">${this._validationMessage}</div>`;
+        return html`
+            <div class="validation-message" slot="after">${this._validationMessage}</div>
+        `;
     }
 
     done(val: string | null) {

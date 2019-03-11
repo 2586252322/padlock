@@ -1,23 +1,27 @@
-import { until } from "lit-html/directives/until";
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { Invite } from "@padloc/core/lib/invite.js";
 import { Group } from "@padloc/core/lib/group.js";
-import { formatDateFromNow } from "../util.js";
 import { shared, mixins } from "../styles";
 import { dialog, prompt } from "../dialog.js";
 import { app, router } from "../init.js";
-import { BaseElement, element, html, property } from "./base.js";
+import { element, html, property, query, observe } from "./base.js";
+import { View } from "./view.js";
 import { Input } from "./input.js";
 import { VaultDialog } from "./vault-dialog.js";
 import { GroupDialog } from "./group-dialog.js";
-import "./toggle-button.js";
-import "./account-item.js";
+import "./member-item.js";
+import "./group-item.js";
+import "./vault-item.js";
+import "./invite-item.js";
 import "./icon.js";
 
 @element("pl-org-view")
-export class OrgView extends BaseElement {
+export class OrgView extends View {
     @property()
-    selected: string = "";
+    orgId: string = "";
+
+    @query("#filterMembersInput")
+    private _filterMembersInput: Input;
 
     @dialog("pl-vault-dialog")
     private _vaultDialog: VaultDialog;
@@ -26,11 +30,14 @@ export class OrgView extends BaseElement {
     private _groupDialog: GroupDialog;
 
     private get _org() {
-        return app.getOrg(this.selected);
+        return app.getOrg(this.orgId);
     }
 
     @property()
     private _page: "members" | "groups" | "vaults" | "invites" = "members";
+
+    @property()
+    private _membersFilter: string = "";
 
     private _createInvite() {
         prompt($l("Please enter the email address of the person you would like to invite!"), {
@@ -60,32 +67,33 @@ export class OrgView extends BaseElement {
     }
 
     private async _createVault() {
-        const org = this._org!;
-
-        await prompt($l("Please choose a vault name!"), {
-            title: $l("Create Vault"),
-            label: $l("Vault Name"),
-            confirmLabel: $l("Create"),
-            validate: async (name: string) => {
-                if (!name) {
-                    throw $l("Please enter a vault name!");
-                }
-                if (org.vaults.some(v => v.name === name)) {
-                    throw $l("This organisation already has a vault with this name!");
-                }
-                await app.createVault(name, org);
-                return name;
-            }
-        });
+        await this._vaultDialog.show({ org: this._org!, vault: null });
+        this.requestUpdate();
     }
 
     private async _showGroup(group: Group) {
-        this._groupDialog.show(group);
+        await this._groupDialog.show({ org: this._org!, group });
+        this.requestUpdate();
+    }
+
+    private async _createGroup() {
+        await this._groupDialog.show({ org: this._org!, group: null });
+        this.requestUpdate();
     }
 
     private async _showVault({ id }: { id: string }) {
         const vault = app.getVault(id) || (await app.api.getVault(id));
-        this._vaultDialog.show(vault);
+        await this._vaultDialog.show({ org: this._org!, vault: vault });
+        this.requestUpdate();
+    }
+
+    private _updateMembersFilter() {
+        this._membersFilter = this._filterMembersInput.value;
+    }
+
+    @observe("orgId")
+    _resetMembersFilter() {
+        this._membersFilter = this._filterMembersInput.value = "";
     }
 
     shouldUpdate() {
@@ -97,173 +105,187 @@ export class OrgView extends BaseElement {
         const isAdmin = org.isAdmin(app.account!);
         const invites = org.invites;
         const groups = [org.admins, org.everyone, ...org.groups];
-        const vaults = org.vaults;
+        const vaults = org.vaults.map(v => app.getVault(v.id)!).filter(v => !!v);
+        const memFilter = this._membersFilter.toLowerCase();
+        const members = memFilter
+            ? org.members.filter(
+                  ({ name, email }) => email.toLowerCase().includes(memFilter) || name.toLowerCase().includes(memFilter)
+              )
+            : org.members;
 
         return html`
             ${shared}
 
             <style>
                 :host {
-                    background: var(--color-tertiary);
                     display: flex;
                     flex-direction: column;
                 }
 
-                .tabs {
-                    display: flex;
-                }
-
-                .tabs > * {
-                    cursor: pointer;
-                    margin-left: 15px;
-                }
-
-                .tabs > *[active] {
-                    font-weight: bold;
-                    color: var(--color-highlight);
-                }
-
-                .subview {
-                    flex: 1;
-                    position: relative;
-                }
-
-                .invite {
-                    padding: 15px 17px;
-                }
-
-                .invite:hover {
-                    background: #fafafa;
-                }
-
-                .invite .tags {
-                    padding: 0;
-                    margin: 0;
-                }
-
-                .invite-email {
-                    font-weight: bold;
-                    ${mixins.ellipsis()}
-                    margin-bottom: 8px;
-                }
-
-                .invite-code {
+                h1 {
                     text-align: center;
                 }
 
-                .invite-code-label {
-                    font-weight: bold;
-                    font-size: var(--font-size-micro);
+                main {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    background: var(--color-quaternary);
+                    border-radius: var(--border-radius);
                 }
 
-                .invite-code-value {
-                    font-size: 140%;
-                    font-family: var(--font-family-mono);
-                    font-weight: bold;
-                    text-transform: uppercase;
-                    cursor: text;
-                    user-select: text;
-                    letter-spacing: 2px;
+                .wrapper {
+                    position: relative;
+                    width: 100%;
+                    flex: 1;
+                    max-width: 600px;
+                    margin: 0 auto;
+                }
+
+                .tabs {
+                    border-bottom: solid 2px #ddd;
+                    background: var(--color-tertiary);
+                    display: flex;
+                    justify-content: center;
+                }
+
+                .tabs > * {
+                    display: flex;
+                    align-items: center;
+                    padding: 10px 20px 10px 15px;
+                }
+
+                .tabs > *[active] {
+                    font-weight: 600;
+                    color: var(--color-highlight);
+                    border-bottom: solid 2px;
+                    margin-bottom: -2px;
+                }
+
+                .subview {
+                    position: relative;
+                    padding: 10px;
+                    ${mixins.fullbleed()}
+                    ${mixins.scroll()}
+                }
+
+                .search-wrapper {
+                    display: flex;
+                    align-items: center;
+                }
+
+                .search-wrapper pl-icon {
+                    opacity: 0.5;
+                    margin-left: 5px;
+                }
+
+                .search-wrapper pl-input {
+                    font-size: var(--font-size-small);
+                    height: auto;
+                    flex: 1;
+                    background: transparent;
+                    padding-left: 5px;
+                }
+
+                .header {
+                    background: white;
                 }
             </style>
 
-            <h1>${org.name}</h1>
-
-            <div class="tabs">
-                <div ?active=${this._page === "members"} @click=${() => (this._page = "members")}>${$l("Members")}</div>
-                <div ?active=${this._page === "groups"} @click=${() => (this._page = "groups")}>${$l("Groups")}</div>
-                <div ?active=${this._page === "vaults"} @click=${() => (this._page = "vaults")}>${$l("Vaults")}</div>
-                <div ?active=${this._page === "invites"} @click=${() => (this._page = "invites")}>${$l("Invites")}</div>
-            </div>
-
-            <div ?hidden=${this._page !== "members"} class="subview">
-
-                ${org.members.map(
-                    member => html`
-                        <div>
-                            ${member.name}
+            <main>
+                <div class="header">
+                    <div class="tabs">
+                        <div class="tap" ?active=${this._page === "members"} @click=${() => (this._page = "members")}>
+                            <pl-icon icon="user"></pl-icon>
+                            <div>${$l("Members")}</div>
                         </div>
-                    `
-                )}
-
-                <div class="fabs" ?hidden=${!isAdmin}>
-                    <div class="flex"></div>
-
-                    <pl-icon icon="add" class="tap fab" @click=${() => this._createInvite()}></pl-icon>
-                </div>
-            </div>
-
-            <div ?hidden=${this._page !== "groups"} class="subview">
-
-                ${groups.map(
-                    group => html`
-                        <div @click=${() => this._showGroup(group)}>${group.name}</div>
-                    `
-                )}
-
-                <div class="fabs" ?hidden=${!isAdmin}>
-                    <div class="flex"></div>
-
-                    <pl-icon icon="add" class="tap fab" @click=${() => {}}></pl-icon>
+                        <div class="tap" ?active=${this._page === "groups"} @click=${() => (this._page = "groups")}>
+                            <pl-icon icon="group"></pl-icon>
+                            <div>${$l("Groups")}</div>
+                        </div>
+                        <div class="tap" ?active=${this._page === "vaults"} @click=${() => (this._page = "vaults")}>
+                            <pl-icon icon="vaults"></pl-icon>
+                            <div>${$l("Vaults")}</div>
+                        </div>
+                        <div class="tap" ?active=${this._page === "invites"} @click=${() => (this._page = "invites")}>
+                            <pl-icon icon="invite"></pl-icon>
+                            <div>${$l("Invites")}</div>
+                        </div>
+                    </div>
                 </div>
 
-            </div>
+                <div class="wrapper">
+                    <div ?hidden=${this._page !== "members"} class="subview">
+                        <div class="search-wrapper item">
+                            <pl-icon icon="search"></pl-icon>
+                            <pl-input
+                                id="filterMembersInput"
+                                placeholder="${$l("Search...")}"
+                                @input=${this._updateMembersFilter}
+                            ></pl-input>
+                        </div>
+                        <ul>
+                            ${members.map(
+                                member => html`
+                                    <li class="tap member">
+                                        <pl-member-item .member=${member}></pl-member-item>
+                                    </li>
+                                `
+                            )}
+                        </ul>
+                    </div>
 
-            <div ?hidden=${this._page !== "vaults"} class="subview">
-
-                ${vaults.map(
-                    vault => html`
-                        <div @click=${() => this._showVault(vault)}>${vault.name}</div>
-                    `
-                )}
-
-                <div class="fabs" ?hidden=${!isAdmin}>
-                    <div class="flex"></div>
-
-                    <pl-icon icon="add" class="tap fab" @click=${() => this._createVault()}></pl-icon>
-                </div>
-
-            </div>
-
-            <div ?hidden=${this._page !== "invites"} class"subview">
-                <ul>
-
-                    ${invites.map(inv => {
-                        const status = inv.expired
-                            ? { icon: "time", class: "warning", text: $l("expired") }
-                            : inv.accepted
-                            ? { icon: "check", class: "highlight", text: $l("accepted") }
-                            : {
-                                  icon: "time",
-                                  class: "",
-                                  text: (async () => $l("expires {0}", await formatDateFromNow(inv.expires)))()
-                              };
-
-                        return html`
-                            <li class="invite layout align-center tap animate" @click=${() => this._showInvite(inv)}>
-                                <div flex>
-                                    <div class="invite-email">${inv.email}</div>
-
-                                    <div class="tags small">
-                                        <div class="tag ${status.class}">
-                                            <pl-icon icon="${status.icon}"></pl-icon>
-
-                                            <div>${until(status.text)}</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="invite-code">
-                                    <div class="invite-code-label">${$l("Confirmation Code:")}</div>
-
-                                    <div class="invite-code-value">${inv.secret}</div>
-                                </div>
+                    <div ?hidden=${this._page !== "groups"} class="subview">
+                        <ul>
+                            ${groups.map(
+                                group => html`
+                                    <li @click=${() => this._showGroup(group)} class="item tap">
+                                        <pl-group-item .group=${group}></pl-group-item>
+                                    </li>
+                                `
+                            )}
+                            <li class="centering padded tap" @click=${this._createGroup}>
+                                <pl-icon icon="add"></pl-icon>
+                                <div>${$l("New Group")}</div>
                             </li>
-                        `;
-                    })}
+                        </ul>
+                    </div>
 
-                </ul>
-            </div>
+                    <div ?hidden=${this._page !== "vaults"} class="subview">
+                        <ul>
+                            ${vaults.map(
+                                vault => html`
+                                    <li @click=${() => this._showVault(vault)} class="item tap">
+                                        <pl-vault-item .vault=${vault}></pl-vault-item>
+                                    </li>
+                                `
+                            )}
+                            <li class="centering padded tap" @click=${this._createVault}>
+                                <pl-icon icon="add"></pl-icon>
+                                <div>${$l("New Vault")}</div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div ?hidden=${this._page !== "invites"} class="subview">
+                        <ul>
+                            ${invites.map(
+                                inv => html`
+                                    <li class="tap" @click=${() => this._showInvite(inv)}>
+                                        <pl-invite-item .invite=${inv}></pl-invite-item>
+                                    </li>
+                                `
+                            )}
+                        </ul>
+                    </div>
+
+                    <div class="fabs" ?hidden=${!isAdmin}>
+                        <div class="flex"></div>
+
+                        <pl-icon icon="invite" class="tap fab" @click=${() => this._createInvite()}></pl-icon>
+                    </div>
+                </div>
+            </main>
         `;
     }
 }

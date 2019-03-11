@@ -5,8 +5,8 @@ import { app } from "../init.js";
 import { shared, mixins } from "../styles";
 import { BaseElement, element, property, html, listen } from "./base.js";
 
-@element("pl-browse-filter")
-export class BrowseFilter extends BaseElement {
+@element("pl-items-filter")
+export class ItemsFilter extends BaseElement {
     @property()
     private _selecting: Boolean = false;
 
@@ -122,53 +122,39 @@ export class BrowseFilter extends BaseElement {
             </style>
 
             <button class="tap ${cl}" @click=${() => (this._selecting = true)} ?hidden=${this._selecting}>
-
                 <pl-icon icon="${icon}"></pl-icon>
 
                 <div>${label}</div>
 
                 <pl-icon icon="dropdown"></pl-icon>
-
             </button>
 
             <div class="scrim" ?hidden=${!this._selecting} @click=${() => this._dismiss()}>
-
                 <div class="list ${cl}">
-
                     <div>
-
                         <div class="option tap" @click=${() => this._select({ tag: null, vault: null })}>
-
                             <pl-icon icon="list"></pl-icon>
 
                             <div>${$l("All Items")}</div>
-
                         </div>
-
                     </div>
 
                     <div>
-
                         <div>
-
                             <h4>${$l("Vaults")}</h4>
 
                             ${app.vaults.map(
                                 vault => html`
                                     <div class="option tap" @click=${() => this._select({ tag: null, vault })}>
-
                                         <pl-icon icon="vault"></pl-icon>
 
-                                        <div>${vault.parent ? `${vault.parent.name}/${vault.name}` : vault.name}</div>
-
+                                        <div>${vault}</div>
                                     </div>
                                 `
                             )}
-
                         </div>
 
                         <div>
-
                             <h4>${$l("Tags")}</h4>
 
                             <div class="no-tags" ?hidden=${!!app.tags.length}>
@@ -178,20 +164,16 @@ export class BrowseFilter extends BaseElement {
                             ${app.tags.map(
                                 tag => html`
                                     <div class="option tap" @click=${() => this._select({ tag, vault: null })}>
-
                                         <pl-icon icon="tag"></pl-icon>
 
                                         <div>${tag}</div>
-
                                     </div>
                                 `
                             )}
-
                         </div>
-
                     </div>
-
                 </div>
+            </div>
         `;
     }
 

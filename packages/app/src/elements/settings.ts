@@ -208,8 +208,8 @@ export class Settings extends View {
                 if (name === account.name) {
                     return name;
                 }
-                account.setName(name);
-                await app.syncAccount();
+                account.name = name;
+                await app.updateAccount(account);
                 return name;
             }
         });

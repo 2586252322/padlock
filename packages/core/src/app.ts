@@ -4,7 +4,7 @@ import { Serializable } from "./encoding";
 import { Invite, InvitePurpose } from "./invite";
 import { Vault, VaultID } from "./vault";
 import { Org, OrgID, OrgMember } from "./org";
-import { Group } from "./group";
+import { GroupID } from "./group";
 import { VaultItem, Field, Tag, createVaultItem } from "./item";
 import { Account } from "./account";
 import { Auth, EmailVerificationPurpose } from "./auth";
@@ -384,6 +384,17 @@ export class App extends EventEmitter {
         this.dispatch("account-changed", { account: this.account });
     }
 
+    async updateAccount() {
+        const account = await this.api.updateAccount(this.account!);
+        // TODO: public key change?
+        if (this.account) {
+            account.privateKey = this.account.privateKey;
+        }
+        this.state.account = account;
+        this.storage.save(this.state);
+        this.dispatch("account-changed", { account: this.account });
+    }
+
     async revokeSession(session: Session) {
         await this.api.revokeSession(session.id);
         await this.fetchAccount();
@@ -419,7 +430,11 @@ export class App extends EventEmitter {
         return this._vaults.get(id) || null;
     }
 
-    async createVault(name: string, org: Org, groups: Group[] = []): Promise<Vault> {
+    async createVault(
+        name: string,
+        org: Org,
+        groups: { id: GroupID; readonly: boolean }[] = [{ id: org.admins.id, readonly: false }]
+    ): Promise<Vault> {
         let vault = new Vault();
         vault.name = name;
         vault.org = { id: org.id, name: org.name };
@@ -428,8 +443,8 @@ export class App extends EventEmitter {
         org = org.clone();
         await org.unlock(this.account!);
 
-        [org.admins, ...groups].forEach(({ id }) => org.getGroup(id)!.vaults.push({ id: vault.id, readonly: false }));
-        await vault.updateAccessors([org.admins, ...groups]);
+        groups.forEach(({ id, readonly }) => org.getGroup(id)!.vaults.push({ id: vault.id, readonly }));
+        await vault.updateAccessors(groups.map(({ id }) => org.getGroup(id)!));
 
         await this.api.updateVault(vault);
         await this.updateOrg(org, org);
@@ -439,11 +454,27 @@ export class App extends EventEmitter {
         return vault;
     }
 
-    // async deleteVault({ id }: { id: VaultID }): Promise<void> {
-    //     await this.api.deleteVault(id);
-    //     await this.synchronize();
-    // }
-    //
+    async updateVault(vault: Vault, _name: string, groups: { id: GroupID; readonly: boolean }[]) {
+        if (!vault.org) {
+            return "Cannot update vaults that are not part of an org!";
+        }
+
+        const org = this.getOrg(vault.org.id)!;
+
+        for (const group of org.groups) {
+            // remove previous vault entry
+            group.vaults = group.vaults.filter(v => v.id !== vault.id);
+            // update vault entry
+            const selection = groups.find(g => g.id === group.id);
+            if (selection) {
+                group.vaults.push({ id: vault.id, readonly: selection.readonly });
+            }
+        }
+
+        await this.updateOrg(org, org);
+        await this.syncVault(vault);
+    }
+
     // async archiveVault({ id }: { id: VaultID }): Promise<void> {
     //     const vault = this.getVault(id)!;
     //     await Promise.all([...vault.vaults].map(v => this.archiveVault(v)));
@@ -488,20 +519,7 @@ export class App extends EventEmitter {
     }
 
     async deleteVault(vault: Vault) {
-        const org = vault.org && this.getOrg(vault.org.id);
-        if (!org) {
-            throw "Can't delete private vault";
-        }
-
         await this.api.deleteVault(vault.id);
-
-        for (const group of org.getGroupsForVault(vault)) {
-            group.vaults = group.vaults.filter(v => v.id === vault.id);
-        }
-
-        org.vaults = org.vaults.filter(v => v.id === vault.id);
-
-        await this.updateOrg(org, org);
         await this.synchronize();
     }
 

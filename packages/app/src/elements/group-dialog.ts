@@ -1,38 +1,40 @@
+import { Org, OrgMember } from "@padloc/core/lib/org.js";
 import { Group } from "@padloc/core/lib/group.js";
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { app } from "../init.js";
-import { element, html, property, query, queryAll, listen } from "./base.js";
+import { element, html, property, query } from "./base.js";
 import { Dialog } from "./dialog.js";
 import { LoadingButton } from "./loading-button.js";
+import { Input } from "./input.js";
+import "./toggle-button.js";
+import "./member-item.js";
+
+type InputType = { group: Group | null; org: Org };
 
 @element("pl-group-dialog")
-export class GroupDialog extends Dialog<Group, void> {
+export class GroupDialog extends Dialog<InputType, void> {
     @property()
     group: Group | null = null;
 
-    private get _org() {
-        return (
-            this.group &&
-            app.orgs.find(org => [org.admins, org.everyone, ...org.groups].some(g => g.id === this.group!.id))
-        );
-    }
-
-    @queryAll("input[type='checkbox']")
-    private _checkboxes: HTMLInputElement[];
+    @property()
+    org: Org | null = null;
 
     @query("#saveButton")
     private _saveButton: LoadingButton;
 
+    @query("#nameInput")
+    private _nameInput: Input;
+
     private _selectedMembers = new Set<string>();
 
-    private get _currentMembers(): Set<string> {
+    private _getCurrentMembers(): Set<string> {
         const members = new Set<string>();
 
-        if (!this._org) {
+        if (!this.group || !this.org) {
             return members;
         }
 
-        for (const member of this._org.getMembersForGroup(this.group!)) {
+        for (const member of this.org.getMembersForGroup(this.group!)) {
             members.add(member.id);
         }
 
@@ -40,27 +42,35 @@ export class GroupDialog extends Dialog<Group, void> {
     }
 
     private get _hasChanged() {
-        return (
-            this._selectedMembers.size !== this._currentMembers.size ||
-            [...this._selectedMembers.values()].some(group => !this._currentMembers.has(group))
-        );
+        if (!this._nameInput) {
+            return false;
+        }
+        const currentMembers = this._getCurrentMembers();
+        const membersChanged =
+            this._selectedMembers.size !== currentMembers.size ||
+            [...this._selectedMembers.values()].some(group => !currentMembers.has(group));
+
+        const nameChanged = this.group ? this.group.name !== this._nameInput.value : !!this._nameInput.value;
+
+        return this._selectedMembers.size && this._nameInput.value && (membersChanged || nameChanged);
     }
 
-    show(group: Group): Promise<void> {
+    async show({ org, group }: InputType): Promise<void> {
+        this.org = org;
         this.group = group;
-        this._selectedMembers = new Set<string>(this._currentMembers);
-        return super.show();
+        this._selectedMembers = this._getCurrentMembers();
+        await super.show();
+        await this.updateComplete;
+        if (group) {
+            setTimeout(() => this._nameInput.focus(), 100);
+        }
     }
 
-    @listen("change", "input[type='checkbox']")
-    _updateSelected() {
-        this._selectedMembers.clear();
-
-        for (const checkbox of this._checkboxes) {
-            const member = checkbox.dataset.member;
-            if (member && checkbox.checked) {
-                this._selectedMembers.add(member);
-            }
+    _toggleMember(member: OrgMember) {
+        if (this._selectedMembers.has(member.id)) {
+            this._selectedMembers.delete(member.id);
+        } else {
+            this._selectedMembers.add(member.id);
         }
 
         this.requestUpdate();
@@ -74,65 +84,88 @@ export class GroupDialog extends Dialog<Group, void> {
         this._saveButton.start();
 
         try {
-            const org = this._org!.clone();
+            const org = this.org!.clone();
             await org.unlock(app.account!);
-            const group = org.getGroup(this.group!.id)!;
 
             const members = [...this._selectedMembers.values()].map(id => org.getMember({ id }));
-            await group.unlock(org.admins);
-            await group.updateAccessors([org.admins, ...members]);
+
+            if (this.group) {
+                const group = org.getGroup(this.group.id)!;
+                group.name = this._nameInput.value;
+                await group.unlock(org.admins);
+                await group.updateAccessors([org.admins, ...members]);
+            } else {
+                await org.createGroup(this._nameInput.value, members);
+            }
 
             await app.updateOrg(org, org);
             this._saveButton.success();
+            this.done();
         } catch (e) {
             this._saveButton.fail();
             throw e;
         }
-
-        this.requestUpdate();
     }
 
     shouldUpdate() {
-        return !!this.group;
+        return !!this.org;
     }
 
     renderContent() {
-        const group = this.group!;
-        const members = this._org!.members;
+        const members = this.org!.members;
 
         return html`
             <style>
                 .inner {
-                    background: var(--color-tertiary);
-                    color: var(--color-secondary);
-                    text-shadow: none;
+                    background: var(--color-quaternary);
+                }
+
+                .input-wrapper {
+                    font-weight: bold;
+                    font-size: 120%;
+                }
+
+                pl-toggle-button {
+                    display: block;
+                    padding: 0 15px 0 0;
                 }
             </style>
 
-            <h1>${group.name}</h1>
+            <div class="input-wrapper item">
+                <pl-icon icon="group"></pl-icon>
+                <pl-input
+                    id="nameInput"
+                    .placeholder=${$l("Enter Group Name")}
+                    .value=${this.group ? this.group.name : ""}
+                    @input=${() => this.requestUpdate()}
+                ></pl-input>
+            </div>
 
-            <h2>${$l("Members")}</h2>
-
-            <ul>
-                ${members.map(
-                    member => html`
-                    <li>
-                        <label>
-                            <input
-                                type="checkbox"
-                                data-member=${member.id}
-                                .checked=${this._selectedMembers.has(member.id)}
-                            ></input> 
-                            ${member.name}
-                        </label>
-                    </li>
+            ${members.map(
+                member => html`
+                    <pl-toggle-button
+                        class="item tap"
+                        reverse
+                        @click=${() => this._toggleMember(member)}
+                        .active=${this._selectedMembers.has(member.id)}
+                    >
+                        <pl-member-item .member=${member}></pl-member-item>
+                    </pl-toggle-button>
                 `
-                )}
-            </ul>
+            )}
 
-            <pl-loading-button id="saveButton" ?hidden=${!this._hasChanged} @click=${this._save}
-                >${$l("Save")}</pl-loading-button
-            >
+            <div class="actions">
+                <pl-loading-button
+                    class="tap primary"
+                    id="saveButton"
+                    ?disabled=${!this._hasChanged}
+                    @click=${this._save}
+                >
+                    ${$l("Save")}
+                </pl-loading-button>
+
+                <button class="tap" @click=${this.dismiss}>${$l("Cancel")}</button>
+            </div>
         `;
     }
 }

@@ -3,7 +3,7 @@ import { Invite } from "@padloc/core/lib/invite.js";
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { formatDateFromNow } from "../util.js";
 import { app } from "../init";
-import { shared, mixins } from "../styles";
+import { shared } from "../styles";
 import { alert } from "../dialog.js";
 import { element, html, property, query } from "./base.js";
 import { Dialog } from "./dialog.js";
@@ -82,7 +82,6 @@ export class InviteDialog extends Dialog<Invite, void> {
 
                 .invite {
                     overflow: hidden;
-                    ${mixins.gradientHighlight()}
                 }
 
                 .invite-text {
@@ -124,9 +123,6 @@ export class InviteDialog extends Dialog<Invite, void> {
                 }
 
                 .tag {
-                    background: var(--color-foreground);
-                    color: var(--color-highlight);
-                    text-shadow: none;
                     box-shadow: rgba(0, 0, 0, 0.2) 0 2px 2px;
                 }
 
@@ -153,7 +149,7 @@ export class InviteDialog extends Dialog<Invite, void> {
                 <h1>${purpose === "confirm_membership" ? $l("Confirm Membership") : $l("Org Invite")}</h1>
 
                 <div class="tags">
-                    <div class="tag org">
+                    <div class="tag org highlight">
                         <pl-icon icon="org"></pl-icon>
 
                         <div>${org!.name}</div>
@@ -177,7 +173,7 @@ export class InviteDialog extends Dialog<Invite, void> {
                     )}
                 </div>
 
-                <div class="layout horizontal">
+                <div class="actions">
                     ${forMe ? this._inviteeActions() : this._adminActions()}
                 </div>
             </div>
@@ -223,7 +219,7 @@ export class InviteDialog extends Dialog<Invite, void> {
         return html`
             <pl-loading-button
                 id="acceptButton"
-                class="tap flex tiles-2"
+                class="tap primary"
                 ?hidden=${!this._enableActions}
                 @click=${() => this._accept()}
             >
@@ -261,21 +257,10 @@ export class InviteDialog extends Dialog<Invite, void> {
         const { accepted, expired, purpose } = this.invite!;
         return html`
             <pl-loading-button
-                ?hidden=${accepted}
-                id="resendButton"
-                class="tap flex tiles-3"
-                @click=${() => this._resend()}
-            >
-                <pl-icon icon="mail"></pl-icon>
-
-                <div>${$l("Resend")}</div>
-            </pl-loading-button>
-
-            <pl-loading-button
                 ?hidden=${!accepted}
                 ?disabled=${!accepted || expired || !this._verified}
                 id="confirmButton"
-                class="tap flex tiles-3"
+                class="tap primary"
                 @click=${() => this._confirm()}
             >
                 <pl-icon icon="invite"></pl-icon>
@@ -283,10 +268,16 @@ export class InviteDialog extends Dialog<Invite, void> {
                 <div>${$l(purpose === "confirm_membership" ? "Confirm Member" : "Add Member")}</div>
             </pl-loading-button>
 
-            <pl-loading-button id="deleteButton" class="tap flex tiles-2" @click=${() => this._delete()}>
+            <pl-loading-button id="deleteButton" class="tap negative" @click=${() => this._delete()}>
                 <pl-icon icon="delete"></pl-icon>
 
                 <div>${$l("Delete")}</div>
+            </pl-loading-button>
+
+            <pl-loading-button ?hidden=${accepted} id="resendButton" class="tap" @click=${() => this._resend()}>
+                <pl-icon icon="mail"></pl-icon>
+
+                <div>${$l("Resend")}</div>
             </pl-loading-button>
         `;
     }

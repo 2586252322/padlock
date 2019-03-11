@@ -132,11 +132,8 @@ export class FieldElement extends BaseElement {
                     box-sizing: border-box;
                 }
 
-                pl-input:not([readonly]),
-                pl-select {
-                    background: #fafafa;
-                    border: solid 1px #eee;
-                    border-radius: 8px;
+                pl-input[readonly] {
+                    background: transparent;
                 }
             </style>
 

@@ -50,12 +50,21 @@ export const shared = html`
         font-weight: inherit;
         border: none;
         margin: 0;
-        height: var(--row-height);
-        line-height: var(--row-height);
-        padding: 0 15px;
+        padding: 12px 15px;
         cursor: pointer;
         text-align: center;
-        background: transparent;
+        text-shadow: inherit;
+    }
+
+    button.icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    button.icon pl-icon {
+        width: 30px;
+        height: 20px;
     }
 
     button.arrow, a.button.arrow {
@@ -72,11 +81,24 @@ export const shared = html`
         bottom: 0;
     }
 
-    button {
-        text-shadow: inherit;
+    button, pl-loading-button, pl-toggle-button, a.button {
+        background: var(--color-btn-back);
+        border-radius: var(--border-radius);
     }
 
-    input:not([type="checkbox"]), select {
+    button.primary, pl-loading-button.primary, a.button.primary {
+        background: var(--color-highlight);
+        color: var(--color-tertiary);
+        font-weight: bold;
+    }
+
+    button.negative, pl-loading-button.negative, a.button.negative {
+        background: var(--color-negative);
+        color: var(--color-tertiary);
+        font-weight: bold;
+    }
+
+    input, select {
         border: none;
         -webkit-appearance: none;
         -mox-appearance: none;
@@ -118,7 +140,6 @@ export const shared = html`
     }
 
     h1, h2 {
-        margin: 20px;
         display: flex;
         align-items: center;
         text-align: left;
@@ -132,11 +153,12 @@ export const shared = html`
 
     h1 {
         font-size: 150%;
+        margin: 20px 20px 10px 20px;
     }
 
     h2 {
         font-size: 120%;
-        margin: 20px 10px 8px 15px;
+        margin: 10px 20px 5px 20px;
     }
 
     ::-webkit-search-cancel-button {
@@ -180,51 +202,19 @@ export const shared = html`
 
     header {
         display: flex;
-        height: var(--row-height);
-        background: var(--color-background);
-        font-size: var(--font-size-default);
-        z-index: 1;
-        border-bottom: solid 1px #ddd;
-        align-items: center;
-    }
-
-    header > .title {
-        line-height: var(--row-height);
-        padding: 0 10px;
-        flex: 1;
-        font-weight: bold;
-        text-align: center;
-        ${mixins.ellipsis()}
-    }
-
-    header pl-icon {
-        margin: 5px;
-        border-radius: 100%;
-        overflow: hidden;
         font-size: 120%;
-    }
-
-    header.back-header {
-        border: none;
+        padding: 10px;
+        background: var(--color-tertiary);
+        z-index: 1;
+        border-bottom: solid 2px var(--color-shade-1);
         align-items: center;
-        padding-left: 15px;
-        color: var(--color-tertiary);
-        margin-top: 10px;
-        margin-bottom: -10px;
-        z-index: 2;
-        height: 40px;
-        background: inherit;
+        font-weight: bold;
     }
 
-    header.back-header > * {
-        color: var(--color-primary);
-    }
-
-    header.back-header pl-icon {
-        font-size: 90%;
-        width: 20px;
-        top: 1px;
-        margin: 0;
+    header pl-input {
+        height: auto;
+        background: transparent;
+        padding: 0 5px;
     }
 
     main {
@@ -238,6 +228,17 @@ export const shared = html`
         list-style: none;
         padding: 0;
         margin: 0;
+    }
+
+    li, .item {
+        border-radius: var(--border-radius);
+        background: var(--color-tertiary);
+        border: solid 1px var(--color-shade-1);
+        margin: 6px;
+    }
+
+    li.padded, .item.padded {
+        padding: 8px;
     }
 
     pl-dialog .message {
@@ -281,6 +282,10 @@ export const shared = html`
 
     .tap:active::after {
         ${mixins.tapHighlightActiveAfter()}
+    }
+
+    .tap:not(:active):hover::after {
+        ${mixins.tapHighlightHoverAfter()}
     }
 
     .tiles > :nth-child(8n + 1), .tiles-1 {
@@ -436,6 +441,7 @@ export const shared = html`
 
     .tags.small .tag {
         font-size: var(--font-size-micro);
+        padding: 4px 8px;
     }
 
     .tags.small pl-icon {
@@ -477,6 +483,12 @@ export const shared = html`
         ${mixins.gradientWarning(true)}
     }
 
+    .centering {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     .empty-placeholder {
         ${mixins.fullbleed()}
         display: flex;
@@ -498,6 +510,17 @@ export const shared = html`
 
     .empty-placeholder > div {
         width: 200px;
+    }
+
+    .input-wrapper {
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+    }
+
+    .input-wrapper pl-input {
+        padding: 0;
+        background: transparent;
     }
 
     @keyframes spin {
