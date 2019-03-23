@@ -37,7 +37,7 @@ export class InviteItem extends BaseElement {
             const unlockOrg = org.unlock(account);
             secret = (async () => {
                 await unlockOrg;
-                await inv.unlock(org);
+                await inv.unlock(org.invitesKey);
                 return inv.secret;
             })();
         }

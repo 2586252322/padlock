@@ -44,6 +44,7 @@ export class ItemsFilter extends BaseElement {
                     background: var(--color-shade-1);
                     border-bottom: solid 2px var(--color-shade-2);
                     margin-bottom: -2px;
+                    font-size: var(--font-size-small);
                 }
 
                 button.vault {

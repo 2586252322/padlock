@@ -71,14 +71,15 @@ export class Account extends PBES2Container implements Storable, AccountInfo {
 
     validate() {
         return (
-            typeof this.id === "string" &&
-            typeof this.email === "string" &&
-            typeof this.name === "string" &&
-            typeof this.mainVault === "string" &&
-            this.created instanceof Date &&
-            this.updated instanceof Date &&
-            this.publicKey instanceof Uint8Array &&
-            this.orgs.every(org => typeof org === "string")
+            super.validate() &&
+            (typeof this.id === "string" &&
+                typeof this.email === "string" &&
+                typeof this.name === "string" &&
+                typeof this.mainVault === "string" &&
+                this.created instanceof Date &&
+                this.updated instanceof Date &&
+                this.publicKey instanceof Uint8Array &&
+                this.orgs.every(org => typeof org === "string"))
         );
     }
 

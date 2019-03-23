@@ -32,6 +32,7 @@ export class Serializable {
         Object.assign(this, raw);
         try {
             if (!this.validate()) {
+                console.log("failed to validate", this.type, raw);
                 throw new Err(ErrorCode.ENCODING_ERROR);
             }
         } catch (e) {

@@ -1,4 +1,4 @@
-import { Vault } from "@padloc/core/lib/vault.js";
+import { VaultID } from "@padloc/core/lib/vault.js";
 import { shared } from "../styles";
 import { BaseElement, element, html, property } from "./base.js";
 import "./icon.js";
@@ -6,7 +6,7 @@ import "./icon.js";
 @element("pl-vault-item")
 export class VaultItem extends BaseElement {
     @property()
-    vault: Vault;
+    vault: { id: VaultID; name: string };
 
     render() {
         return html`
@@ -52,13 +52,13 @@ export class VaultItem extends BaseElement {
                     <div class="tag">
                         <pl-icon icon="group"></pl-icon>
 
-                        <div>${this.vault.accessors.length}</div>
+                        <div>0</div>
                     </div>
 
                     <div class="tag">
                         <pl-icon icon="list"></pl-icon>
 
-                        <div>${this.vault.items.size}</div>
+                        <div>0</div>
                     </div>
                 </div>
             </div>

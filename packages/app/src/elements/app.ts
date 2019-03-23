@@ -292,7 +292,7 @@ class App extends AutoSync(ErrorHandling(AutoLock(BaseElement))) {
             if (invite) {
                 if (org && org.isAdmin(app.account!)) {
                     await org.unlock(app.account!);
-                    await invite.unlock(org);
+                    await invite.unlock(org.invitesKey);
                 }
                 await this._inviteDialog.show(invite);
                 if (router.canGoBack) {

@@ -1,4 +1,4 @@
-import { Group } from "@padloc/core/lib/group.js";
+import { Group } from "@padloc/core/lib/org.js";
 import { shared } from "../styles";
 import { BaseElement, element, html, property } from "./base.js";
 import "./icon.js";
@@ -52,7 +52,7 @@ export class GroupItem extends BaseElement {
                     <div class="tag">
                         <pl-icon icon="user"></pl-icon>
 
-                        <div>${this.group.accessors.length}</div>
+                        <div>${this.group.members.length}</div>
                     </div>
 
                     <div class="tag">

@@ -80,10 +80,7 @@ export function appSpec(): Spec {
 
         test("Create Vault", async () => {
             const name = "My Shared Vault";
-            const vault = await app.createVault(name, app.orgs[0], [
-                { id: app.orgs[0].admins.id, readonly: false },
-                { id: app.orgs[0].everyone.id, readonly: false }
-            ]);
+            const vault = await app.createVault(name, app.orgs[0], [{ id: app.account!.id, readonly: false }]);
             assert.equal(vault.name, name);
             assert.equal(app.vaults.length, 2);
         });
@@ -119,18 +116,18 @@ export function appSpec(): Spec {
             assert.equal(addedMessage.org.id, org.id);
         });
 
-        test("Create Group", async () => {
-            const org = app.orgs[0];
-            const { id } = await app.createGroup(org, "Some Group", org.members)!;
-            const group = app.orgs[0].getGroup(id)!;
-            assert.ok(group);
-            assert.isTrue(group.isMember(app.account!));
-            assert.isTrue(group.isMember(otherApp.account!));
-
-            await app.createVault("Another Vault", app.orgs[0], [{ id: group.id, readonly: false }]);
-            await otherApp.synchronize();
-            assert.equal(otherApp.vaults.length, 3);
-        });
+        // test("Create Group", async () => {
+        //     const org = app.orgs[0];
+        //     const { id } = await app.createGroup(org, "Some Group", org.members)!;
+        //     const group = app.orgs[0].getGroup(id)!;
+        //     assert.ok(group);
+        //     assert.isTrue(group.isMember(app.account!));
+        //     assert.isTrue(group.isMember(otherApp.account!));
+        //
+        //     await app.createVault("Another Vault", app.orgs[0], [{ id: group.id, readonly: false }]);
+        //     await otherApp.synchronize();
+        //     assert.equal(otherApp.vaults.length, 3);
+        // });
         //
         // test("Add Member To Subvault", async () => {
         //     app.vaults[2].addMember(app.vaults[1].members.get(otherApp.account!.id)!);

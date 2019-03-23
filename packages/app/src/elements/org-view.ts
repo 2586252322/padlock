@@ -1,7 +1,6 @@
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { Invite } from "@padloc/core/lib/invite.js";
-import { OrgMember } from "@padloc/core/lib/org.js";
-import { Group } from "@padloc/core/lib/group.js";
+import { OrgMember, Group } from "@padloc/core/lib/org.js";
 import { shared, mixins } from "../styles";
 import { dialog, prompt } from "../dialog.js";
 import { app, router } from "../init.js";
@@ -113,8 +112,8 @@ export class OrgView extends View {
         const org = this._org!;
         const isAdmin = org.isAdmin(app.account!);
         const invites = org.invites;
-        const groups = [org.admins, org.everyone, ...org.groups];
-        const vaults = org.vaults.map(v => app.getVault(v.id)!).filter(v => !!v);
+        const groups = org.groups;
+        const vaults = org.vaults;
         const memFilter = this._membersFilter.toLowerCase();
         const members = memFilter
             ? org.members.filter(

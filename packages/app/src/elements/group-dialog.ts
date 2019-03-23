@@ -1,5 +1,4 @@
-import { Org, OrgMember } from "@padloc/core/lib/org.js";
-import { Group } from "@padloc/core/lib/group.js";
+import { Org, OrgMember, Group } from "@padloc/core/lib/org.js";
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { app } from "../init.js";
 import { prompt } from "../dialog.js";
@@ -32,7 +31,7 @@ export class GroupDialog extends Dialog<InputType, void> {
     @property()
     private _membersFilter: string = "";
 
-    private _selectedMembers = new Set<string>();
+    private _members = new Set<string>();
 
     private _getCurrentMembers(): Set<string> {
         const members = new Set<string>();
@@ -54,18 +53,18 @@ export class GroupDialog extends Dialog<InputType, void> {
         }
         const currentMembers = this._getCurrentMembers();
         const membersChanged =
-            this._selectedMembers.size !== currentMembers.size ||
-            [...this._selectedMembers.values()].some(group => !currentMembers.has(group));
+            this._members.size !== currentMembers.size ||
+            [...this._members.values()].some(group => !currentMembers.has(group));
 
         const nameChanged = this.group ? this.group.name !== this._nameInput.value : !!this._nameInput.value;
 
-        return this._selectedMembers.size && this._nameInput.value && (membersChanged || nameChanged);
+        return this._members.size && this._nameInput.value && (membersChanged || nameChanged);
     }
 
     async show({ org, group }: InputType): Promise<void> {
         this.org = org;
         this.group = group;
-        this._selectedMembers = this._getCurrentMembers();
+        this._members = this._getCurrentMembers();
         await this.updateComplete;
         this._nameInput.value = group ? group.name : "";
         this._clearMembersFilter();
@@ -76,10 +75,10 @@ export class GroupDialog extends Dialog<InputType, void> {
     }
 
     _toggleMember(member: OrgMember) {
-        if (this._selectedMembers.has(member.id)) {
-            this._selectedMembers.delete(member.id);
+        if (this._members.has(member.id)) {
+            this._members.delete(member.id);
         } else {
-            this._selectedMembers.add(member.id);
+            this._members.add(member.id);
         }
 
         this.requestUpdate();
@@ -96,7 +95,7 @@ export class GroupDialog extends Dialog<InputType, void> {
             const org = this.org!.clone();
             await org.unlock(app.account!);
 
-            const members = [...this._selectedMembers.values()].map(id => org.getMember({ id }));
+            const members = [...this._members.values()].map(id => org.getMember({ id }));
 
             if (this.group) {
                 await app.updateGroup(org, this.group, members, this._nameInput.value);
@@ -113,28 +112,25 @@ export class GroupDialog extends Dialog<InputType, void> {
     }
 
     private async _deleteGroup() {
-        const deleted = await prompt(
-            $l(
-                "Are you sure you want to delete this vault? " +
-                    "All the data stored in it will be lost! " +
-                    "This action can not be undone."
-            ),
-            {
-                type: "destructive",
-                placeholder: $l("Type 'DELETE' to confirm"),
-                validate: async val => {
-                    if (val !== "DELETE") {
-                        throw $l("Type 'DELETE' to confirm");
-                    }
+        this.open = false;
 
-                    await app.updateOrg(this.org!.id, async org => {
-                        org.groups = org.groups.filter(group => group.id !== this.group!.id);
-                    });
-
-                    return val;
+        const deleted = await prompt($l("Are you sure you want to delete this group?"), {
+            type: "destructive",
+            title: $l("Delete Vault"),
+            placeholder: $l("Type 'DELETE' to confirm"),
+            confirmLabel: $l("Delete"),
+            validate: async val => {
+                if (val !== "DELETE") {
+                    throw $l("Type 'DELETE' to confirm");
                 }
+
+                await app.updateOrg(this.org!.id, async org => {
+                    org.groups = org.groups.filter(group => group.name !== this.group!.name);
+                });
+
+                return val;
             }
-        );
+        });
 
         if (deleted) {
             this.done();
@@ -163,12 +159,9 @@ export class GroupDialog extends Dialog<InputType, void> {
                   ({ name, email }) => email.toLowerCase().includes(memFilter) || name.toLowerCase().includes(memFilter)
               )
             : org.members;
-        // members.sort((a, b) => this._selectedMembers.has(a.id) - this._selectedMembers.has(b.id));
-        const canEditName =
-            org.isAdmin(app.account!) &&
-            (!this.group || (this.group.id !== org.admins.id && this.group.id !== org.everyone.id));
-        const canDelete = this.group && canEditName;
-        const canEditMembers = org.isAdmin(app.account!) && (!this.group || this.group.id !== org.everyone.id);
+        // members.sort((a, b) => this._members.has(a.id) - this._members.has(b.id));
+        const canEdit = org.isAdmin(app.account!);
+        const canDelete = this.group && canEdit;
 
         return html`
             <style>
@@ -193,7 +186,7 @@ export class GroupDialog extends Dialog<InputType, void> {
                     id="nameInput"
                     class="flex"
                     .placeholder=${$l("Enter Group Name")}
-                    .readonly=${!canEditName}
+                    .readonly=${!canEdit}
                     @input=${() => this.requestUpdate()}
                 ></pl-input>
                 <pl-icon
@@ -220,15 +213,15 @@ export class GroupDialog extends Dialog<InputType, void> {
                         class="item tap"
                         reverse
                         @click=${() => this._toggleMember(member)}
-                        .active=${this._selectedMembers.has(member.id)}
-                        ?disabled=${!canEditMembers || (this.group === org.admins && org.isOwner(member))}
+                        .active=${this._members.has(member.id)}
+                        ?disabled=${!canEdit}
                     >
                         <pl-member-item .member=${member}></pl-member-item>
                     </pl-toggle-button>
                 `
             )}
 
-            <div class="actions" ?hidden=${!canEditMembers && !canEditName}>
+            <div class="actions" ?hidden=${!canEdit}>
                 <pl-loading-button
                     class="tap primary"
                     id="saveButton"

@@ -262,8 +262,6 @@ export class Context implements API {
         accessors,
         members,
         groups,
-        admins,
-        everyone,
         invites
     }: Org) {
         const { account } = this._requireAuth();
@@ -322,8 +320,6 @@ export class Context implements API {
             accessors,
             members,
             groups,
-            admins,
-            everyone,
             invites
         });
 

@@ -1,6 +1,5 @@
-import { Vault } from "@padloc/core/lib/vault.js";
-import { Group } from "@padloc/core/lib/group.js";
-import { Org } from "@padloc/core/lib/org.js";
+import { VaultID } from "@padloc/core/lib/vault.js";
+import { Org, Group, OrgMember } from "@padloc/core/lib/org.js";
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { mixins } from "../styles";
 import { app } from "../init.js";
@@ -11,9 +10,10 @@ import { LoadingButton } from "./loading-button.js";
 import { Input } from "./input.js";
 import "./icon.js";
 import "./group-item.js";
+import "./member-item.js";
 import "./toggle.js";
 
-type InputType = { vault: Vault | null; org: Org };
+type InputType = { vault: { id: VaultID; name: string } | null; org: Org };
 
 @element("pl-vault-dialog")
 export class VaultDialog extends Dialog<InputType, void> {
@@ -21,7 +21,7 @@ export class VaultDialog extends Dialog<InputType, void> {
     org: Org | null = null;
 
     @property()
-    vault: Vault | null = null;
+    vault: { id: VaultID; name: string } | null = null;
 
     @query("#nameInput")
     private _nameInput: Input;
@@ -29,28 +29,50 @@ export class VaultDialog extends Dialog<InputType, void> {
     @query("#saveButton")
     private _saveButton: LoadingButton;
 
-    private _selection = new Map<string, { read: boolean; write: boolean }>();
+    @query("#filterInput")
+    private _filterInput: Input;
 
-    private _getCurrentSelection(): Map<string, { read: boolean; write: boolean }> {
-        const selection = new Map<string, { read: boolean; write: boolean }>();
+    @property()
+    private _filterString: string = "";
+
+    private _members = new Map<string, { read: boolean; write: boolean }>();
+
+    private _groups = new Map<string, { read: boolean; write: boolean }>();
+
+    private _getCurrentMembers(): Map<string, { read: boolean; write: boolean }> {
+        const members = new Map<string, { read: boolean; write: boolean }>();
 
         if (!this.org) {
-            return selection;
+            return members;
         }
 
-        const groups = [this.org.everyone, ...this.org.groups];
-
-        for (const group of groups) {
-            const v = this.vault && group.vaults.find(v => v.id === this.vault!.id);
-            selection.set(group.id, {
+        for (const member of this.org.members) {
+            const v = this.vault && member.vaults.find(v => v.id === this.vault!.id);
+            members.set(member.id, {
                 read: !!v,
                 write: !!v && !v.readonly
             });
         }
 
-        selection.set(this.org.admins.id, { read: true, write: true });
+        return members;
+    }
 
-        return selection;
+    private _getCurrentGroups(): Map<string, { read: boolean; write: boolean }> {
+        const groups = new Map<string, { read: boolean; write: boolean }>();
+
+        if (!this.org) {
+            return groups;
+        }
+
+        for (const group of this.org.groups) {
+            const v = this.vault && group.vaults.find(v => v.id === this.vault!.id);
+            groups.set(group.name, {
+                read: !!v,
+                write: !!v && !v.readonly
+            });
+        }
+
+        return groups;
     }
 
     private get _hasChanged() {
@@ -58,58 +80,73 @@ export class VaultDialog extends Dialog<InputType, void> {
             return false;
         }
 
-        const current = this._getCurrentSelection();
-        const selection = this._selection;
+        const currentGroups = this._getCurrentGroups();
+        const groupsChanged = this.org.groups.some(({ name }) => {
+            const c = currentGroups.get(name)!;
+            const s = this._groups.get(name)!;
+            return c.read !== s.read || c.write !== s.write;
+        });
 
-        const groupsChanged = [this.org!.admins, this.org!.everyone, ...this.org!.groups].some(({ id }) => {
-            const c = current.get(id)!;
-            const s = selection.get(id)!;
+        const currentMembers = this._getCurrentMembers();
+        const membersChanged = this.org.members.some(({ id }) => {
+            const c = currentMembers.get(id)!;
+            const s = this._members.get(id)!;
             return c.read !== s.read || c.write !== s.write;
         });
 
         const nameChanged = this.vault ? this.vault.name !== this._nameInput.value : !!this._nameInput.value;
 
-        return this._selection.size && this._nameInput.value && (groupsChanged || nameChanged);
+        return (
+            (this._groups.size || this._members.size) &&
+            this._nameInput.value &&
+            (groupsChanged || membersChanged || nameChanged)
+        );
     }
 
     async show({ vault, org }: InputType): Promise<void> {
         this.vault = vault;
         this.org = org;
-        this._selection = this._getCurrentSelection();
+        this._members = this._getCurrentMembers();
+        this._groups = this._getCurrentGroups();
         await this.updateComplete;
         this._nameInput.value = this.vault ? this.vault.name : "";
         return super.show();
     }
 
-    _toggleGroup(group: Group) {
-        const { read } = this._selection.get(group.id)!;
-        this._selection.set(group.id, read ? { read: false, write: false } : { read: true, write: true });
+    private _toggle(obj: Group | OrgMember) {
+        if (obj instanceof Group) {
+            const { read } = this._groups.get(obj.name)!;
+            this._groups.set(obj.name, read ? { read: false, write: false } : { read: true, write: true });
+        } else {
+            const { read } = this._members.get(obj.id)!;
+            this._members.set(obj.id, read ? { read: false, write: false } : { read: true, write: true });
+        }
         this.requestUpdate();
     }
 
-    _toggleRead(group: Group, event?: Event) {
+    private _toggleRead(obj: Group | OrgMember, event?: Event) {
         if (event) {
             event.stopImmediatePropagation();
         }
 
-        const selection = this._selection.get(group.id)!;
-        selection.read = !selection.read;
-        if (!selection.read) {
-            selection.write = false;
+        const sel = obj instanceof Group ? this._groups.get(obj.name)! : this._members.get(obj.id)!;
+        sel.read = !sel.read;
+        if (!sel.read) {
+            sel.write = false;
         }
 
         this.requestUpdate();
     }
 
-    _toggleWrite(group: Group, event?: Event) {
+    private _toggleWrite(obj: Group | OrgMember, event?: Event) {
         if (event) {
             event.stopImmediatePropagation();
         }
 
-        const selection = this._selection.get(group.id)!;
-        selection.write = !selection.write;
-        if (selection.write) {
-            selection.read = true;
+        const sel = obj instanceof Group ? this._groups.get(obj.name)! : this._members.get(obj.id)!;
+        sel.write = !sel.write;
+        if (sel.write) {
+            sel.read = true;
         }
 
         this.requestUpdate();
@@ -126,18 +163,19 @@ export class VaultDialog extends Dialog<InputType, void> {
 
         this._saveButton.start();
 
-        // Make sure admin group has access
-        this._selection.set(this.org!.admins.id, { read: true, write: true });
+        const groups = [...this._groups.entries()]
+            .filter(([, { read }]) => read)
+            .map(([name, { write }]) => ({ name, readonly: !write }));
 
-        const groups = [...this._selection.entries()]
+        const members = [...this._members.entries()]
             .filter(([, { read }]) => read)
             .map(([id, { write }]) => ({ id, readonly: !write }));
 
         try {
             if (this.vault) {
-                await app.updateVault(this.vault, this._nameInput.value, groups);
+                await app.updateVault(this.org!.id, this.vault.id, this._nameInput.value, members, groups);
             } else {
-                await app.createVault(this._nameInput.value, this.org!, groups);
+                await app.createVault(this._nameInput.value, this.org!, members, groups);
             }
 
             this._saveButton.success();
@@ -161,13 +199,14 @@ export class VaultDialog extends Dialog<InputType, void> {
             {
                 type: "destructive",
                 title: $l("Delete Vault"),
+                confirmLabel: $l("Delete"),
                 placeholder: $l("Type 'DELETE' to confirm"),
                 validate: async val => {
                     if (val !== "DELETE") {
                         throw $l("Type 'DELETE' to confirm");
                     }
 
-                    await app.deleteVault(this.vault!);
+                    await app.deleteVault(this.vault!.id);
 
                     return val;
                 }
@@ -181,24 +220,36 @@ export class VaultDialog extends Dialog<InputType, void> {
         }
     }
 
+    private _updateFilter() {
+        this._filterString = this._filterInput.value;
+    }
+
+    private _clearFilter() {
+        this._filterString = this._filterInput.value = "";
+    }
+
     shouldUpdate() {
         return !!this.org;
     }
 
     renderContent() {
         const org = this.org!;
-        const groups = [org.admins, org.everyone, ...org.groups];
         const isAdmin = org.isAdmin(app.account!);
+
+        const filter = this._filterString.toLowerCase();
+
+        const members = filter
+            ? org.members.filter(
+                  ({ name, email }) => email.toLowerCase().includes(filter) || name.toLowerCase().includes(filter)
+              )
+            : org.members;
+
+        const groups = filter ? org.groups.filter(({ name }) => name.toLowerCase().includes(filter)) : org.groups;
 
         return html`
             <style>
                 .inner {
                     background: var(--color-quaternary);
-                }
-
-                pl-toggle-button {
-                    display: block;
-                    padding: 0 15px 0 0;
                 }
 
                 .delete-button {
@@ -209,18 +260,16 @@ export class VaultDialog extends Dialog<InputType, void> {
                 .subheader {
                     margin: 8px;
                     font-weight: bold;
-                    font-size: var(--font-size-tiny);
                     display: flex;
                     align-items: flex-end;
                     padding: 0 8px;
-                }
-
-                .subheader > * {
+                    font-size: var(--font-size-small);
                 }
 
                 .subheader .permission {
                     width: 50px;
                     text-align: center;
+                    font-size: var(--font-size-tiny);
                     ${mixins.ellipsis()}
                 }
 
@@ -251,7 +300,37 @@ export class VaultDialog extends Dialog<InputType, void> {
                 ></pl-icon>
             </header>
 
-            <div class="subheader">
+            <div class="search-wrapper item">
+                <pl-icon icon="search"></pl-icon>
+                <pl-input id="filterInput" placeholder="${$l("Search...")}" @input=${this._updateFilter}></pl-input>
+                <pl-icon icon="cancel" class="tap" @click=${this._clearFilter}></pl-icon>
+            </div>
+
+            <div class="subheader" ?hidden=${!members.length}>
+                <div>${$l("Members")}</div>
+                <div class="flex"></div>
+                <div class="permission">${$l("read")}</div>
+                <div class="permission">${$l("write")}</div>
+            </div>
+
+            ${members.map(
+                member => html`
+                    <div class="item tap" @click=${() => this._toggle(member)} ?disabled=${!isAdmin}>
+                        <pl-member-item .member=${member} class="flex"></pl-member-item>
+                        <pl-toggle
+                            .active=${this._members.get(member.id)!.read}
+                            @click=${(e: Event) => this._toggleRead(member, e)}
+                        ></pl-toggle>
+                        <pl-toggle
+                            .active=${this._members.get(member.id)!.write}
+                            @click=${(e: Event) => this._toggleWrite(member, e)}
+                        ></pl-toggle>
+                    </div>
+                `
+            )}
+
+            <div class="subheader" ?hidden=${!groups.length}>
+                <div>${$l("Groups")}</div>
                 <div class="flex"></div>
                 <div class="permission">${$l("read")}</div>
                 <div class="permission">${$l("write")}</div>
@@ -259,18 +338,14 @@ export class VaultDialog extends Dialog<InputType, void> {
 
             ${groups.map(
                 group => html`
-                    <div
-                        ?disabled=${group.id === org.admins.id || !isAdmin}
-                        class="item tap"
-                        @click=${() => this._toggleGroup(group)}
-                    >
+                    <div class="item tap" @click=${() => this._toggle(group)} ?disabled=${!isAdmin}>
                         <pl-group-item .group=${group} class="flex"></pl-group-item>
                         <pl-toggle
-                            .active=${this._selection.get(group.id)!.read}
+                            .active=${this._groups.get(group.name)!.read}
                             @click=${(e: Event) => this._toggleRead(group, e)}
                         ></pl-toggle>
                         <pl-toggle
-                            .active=${this._selection.get(group.id)!.write}
+                            .active=${this._groups.get(group.name)!.write}
                             @click=${(e: Event) => this._toggleWrite(group, e)}
                         ></pl-toggle>
                     </div>
