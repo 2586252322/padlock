@@ -45,7 +45,7 @@ export class PlIcon extends BaseElement {
                 }
 
                 :host([icon="more"]) > div::before {
-                    content: "\\f142";
+                    content: "\\f141";
                 }
 
                 :host([icon="delete"]) > div::before {

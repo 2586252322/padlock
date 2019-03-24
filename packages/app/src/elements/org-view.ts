@@ -96,7 +96,8 @@ export class OrgView extends View {
     }
 
     private async _showMember(member: OrgMember) {
-        this._memberDialog.show({ org: this._org!, member });
+        await this._memberDialog.show({ org: this._org!, member });
+        this.requestUpdate();
     }
 
     @observe("orgId")

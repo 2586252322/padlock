@@ -216,7 +216,7 @@ export class GroupDialog extends Dialog<InputType, void> {
                         .active=${this._members.has(member.id)}
                         ?disabled=${!canEdit}
                     >
-                        <pl-member-item .member=${member}></pl-member-item>
+                        <pl-member-item hideRole .member=${member}></pl-member-item>
                     </pl-toggle-button>
                 `
             )}

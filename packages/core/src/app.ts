@@ -3,7 +3,7 @@ import { Storage, Storable } from "./storage";
 import { Serializable } from "./encoding";
 import { Invite, InvitePurpose } from "./invite";
 import { Vault, VaultID } from "./vault";
-import { Org, OrgID, OrgMember, Group } from "./org";
+import { Org, OrgID, OrgMember, OrgRole, Group } from "./org";
 import { VaultItem, Field, Tag, createVaultItem } from "./item";
 import { Account, AccountID } from "./account";
 import { Auth, EmailVerificationPurpose } from "./auth";
@@ -771,21 +771,45 @@ export class App extends EventEmitter {
         });
     }
 
-    async updateMember(org: Org, { id }: OrgMember, vaults: { id: VaultID; readonly: boolean }[], groups: string[]) {
+    async updateMember(
+        org: Org,
+        { id }: OrgMember,
+        {
+            vaults,
+            groups,
+            role
+        }: {
+            vaults?: { id: VaultID; readonly: boolean }[];
+            groups?: string[];
+            role?: OrgRole;
+        }
+    ) {
         await this.updateOrg(org.id, async org => {
             const member = org.getMember({ id })!;
 
-            member.vaults = vaults;
-
-            for (const group of org.groups) {
-                group.members = group.members.filter(m => m.id !== id);
+            if (vaults) {
+                member.vaults = vaults;
             }
 
-            for (const name of groups) {
-                const group = org.getGroup(name)!;
-                group.members.push({ id });
+            if (groups) {
+                for (const group of org.groups) {
+                    group.members = group.members.filter(m => m.id !== id);
+                }
+
+                for (const name of groups) {
+                    const group = org.getGroup(name)!;
+                    group.members.push({ id });
+                }
+            }
+
+            if (role) {
+                member.role = role;
+                await org.unlock(this.account!);
+                await org.updateAccessors(org.members.filter(m => m.role <= OrgRole.Admin));
             }
         });
+
+        return this.getOrg(org.id)!.getMember({ id });
     }
 
     async removeMember(org: Org, { id }: OrgMember) {

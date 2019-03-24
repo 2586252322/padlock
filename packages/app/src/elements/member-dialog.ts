@@ -1,9 +1,9 @@
-import { Org, OrgMember, Group } from "@padloc/core/lib/org.js";
+import { Org, OrgMember, OrgRole, Group } from "@padloc/core/lib/org.js";
 import { VaultID } from "@padloc/core/lib/vault.js";
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { mixins } from "../styles";
 import { app } from "../init.js";
-import { confirm } from "../dialog.js";
+import { confirm, choose } from "../dialog.js";
 import { element, html, property, query } from "./base.js";
 import { Dialog } from "./dialog.js";
 import { LoadingButton } from "./loading-button.js";
@@ -137,13 +137,44 @@ export class MemberDialog extends Dialog<InputType, void> {
             .map(([id, { write }]) => ({ id, readonly: !write }));
 
         try {
-            await app.updateMember(this.org!, this.member!, vaults, [...this._groups]);
+            await app.updateMember(this.org!, this.member!, {
+                vaults,
+                groups: [...this._groups]
+            });
             this._saveButton.success();
             this.done();
         } catch (e) {
             this._saveButton.fail();
             this.requestUpdate();
             throw e;
+        }
+    }
+
+    private async _showOptions() {
+        const isAdmin = this.member!.role === OrgRole.Admin;
+
+        this.open = false;
+        const choice = await choose(
+            "",
+            [$l("Remove"), $l("Suspend"), isAdmin ? $l("Remove Admin") : $l("Make Admin")],
+            {
+                hideIcon: true,
+                type: "destructive"
+            }
+        );
+
+        switch (choice) {
+            case 0:
+                this._removeMember();
+                break;
+            case 1:
+                this.open = true;
+                break;
+            case 2:
+                isAdmin ? this._removeAdmin() : this._makeAdmin();
+                break;
+            default:
+                this.open = true;
         }
     }
 
@@ -155,8 +186,7 @@ export class MemberDialog extends Dialog<InputType, void> {
             $l("Cancel"),
             {
                 type: "destructive",
-                title: $l("Remove Member"),
-                placeholder: $l("Type 'DELETE' to confirm")
+                title: $l("Remove Member")
             }
         );
         this.open = true;
@@ -176,6 +206,59 @@ export class MemberDialog extends Dialog<InputType, void> {
         }
     }
 
+    private async _makeAdmin() {
+        this.open = false;
+
+        const confirmed = await confirm(
+            $l(
+                "Are you sure you want to make this member an admin? " +
+                    "Admins can add and remove members from the organization, " +
+                    "make other members admins " +
+                    "and create, edit and delete groups and vaults."
+            ),
+            $l("Make Admin"),
+            $l("Cancel")
+        );
+
+        this.open = true;
+
+        if (confirmed) {
+            this._saveButton.start();
+
+            try {
+                this.member = await app.updateMember(this.org!, this.member!, { role: OrgRole.Admin });
+                this._saveButton.success();
+            } catch (e) {
+                this._saveButton.fail();
+                throw e;
+            }
+        }
+    }
+
+    private async _removeAdmin() {
+        this.open = false;
+
+        const confirmed = await confirm(
+            $l("Are you sure you want to remove this member as admin?"),
+            $l("Remove Admin"),
+            $l("Cancel")
+        );
+
+        this.open = true;
+
+        if (confirmed) {
+            this._saveButton.start();
+
+            try {
+                this.member = await app.updateMember(this.org!, this.member!, { role: OrgRole.Member });
+                this._saveButton.success();
+            } catch (e) {
+                this._saveButton.fail();
+                throw e;
+            }
+        }
+    }
+
     shouldUpdate() {
         return !!this.org && !!this.member;
     }
@@ -183,7 +266,8 @@ export class MemberDialog extends Dialog<InputType, void> {
     renderContent() {
         const org = this.org!;
         const member = this.member!;
-        const isAdmin = org.isAdmin(app.account!);
+        const accountIsAdmin = org.isAdmin(app.account!);
+        const memberIsOwner = org.isOwner(member);
 
         return html`
             <style>
@@ -196,9 +280,12 @@ export class MemberDialog extends Dialog<InputType, void> {
                     padding: 0 15px 0 0;
                 }
 
-                .delete-button {
-                    color: var(--color-negative);
-                    font-size: var(--font-size-default);
+                .more-button {
+                    font-size: var(--font-size-small);
+                    align-self: flex-start;
+                    width: 30px;
+                    height: 30px;
+                    margin-top: 5px;
                 }
 
                 .subheader {
@@ -230,10 +317,10 @@ export class MemberDialog extends Dialog<InputType, void> {
             <header>
                 <pl-member-item .member=${member} class="flex"></pl-member-item>
                 <pl-icon
-                    icon="delete"
-                    class="delete-button tap"
-                    ?hidden=${!isAdmin}
-                    @click=${this._removeMember}
+                    icon="more"
+                    class="more-button tap"
+                    ?hidden=${!accountIsAdmin || memberIsOwner}
+                    @click=${this._showOptions}
                 ></pl-icon>
             </header>
 
@@ -244,7 +331,7 @@ export class MemberDialog extends Dialog<InputType, void> {
             ${org.groups.map(
                 group => html`
                     <pl-toggle-button
-                        ?disabled=${!isAdmin}
+                        ?disabled=${!accountIsAdmin}
                         class="item tap"
                         reverse
                         @click=${() => this._toggleGroup(group)}
@@ -264,7 +351,7 @@ export class MemberDialog extends Dialog<InputType, void> {
 
             ${org.vaults.map(
                 vault => html`
-                    <div class="item tap" @click=${() => this._toggleVault(vault)} ?disabled=${!isAdmin}>
+                    <div class="item tap" @click=${() => this._toggleVault(vault)} ?disabled=${!accountIsAdmin}>
                         <pl-vault-item .vault=${vault} class="flex"></pl-vault-item>
                         <pl-toggle
                             .active=${this._vaults.get(vault.id)!.read}
@@ -278,7 +365,7 @@ export class MemberDialog extends Dialog<InputType, void> {
                 `
             )}
 
-            <div class="actions" ?hidden=${!isAdmin}>
+            <div class="actions" ?hidden=${!accountIsAdmin}>
                 <pl-loading-button
                     class="tap primary"
                     id="saveButton"

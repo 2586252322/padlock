@@ -316,7 +316,7 @@ export class VaultDialog extends Dialog<InputType, void> {
             ${members.map(
                 member => html`
                     <div class="item tap" @click=${() => this._toggle(member)} ?disabled=${!isAdmin}>
-                        <pl-member-item .member=${member} class="flex"></pl-member-item>
+                        <pl-member-item hideRole .member=${member} class="flex"></pl-member-item>
                         <pl-toggle
                             .active=${this._members.get(member.id)!.read}
                             @click=${(e: Event) => this._toggleRead(member, e)}

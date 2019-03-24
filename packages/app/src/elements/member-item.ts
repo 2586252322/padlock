@@ -1,4 +1,5 @@
-import { OrgMember } from "@padloc/core/lib/org.js";
+import { OrgMember, OrgRole } from "@padloc/core/lib/org.js";
+import { localize as $l } from "@padloc/core/lib/locale.js";
 import { shared } from "../styles";
 import { BaseElement, element, html, property } from "./base.js";
 import "./fingerprint.js";
@@ -8,7 +9,13 @@ export class MemberItem extends BaseElement {
     @property()
     member: OrgMember;
 
+    @property()
+    hideRole: boolean = false;
+
     render() {
+        const isAdmin = this.member.role === OrgRole.Admin;
+        const isOwner = this.member.role === OrgRole.Owner;
+
         return html`
             ${shared}
 
@@ -34,8 +41,18 @@ export class MemberItem extends BaseElement {
                     width: 0;
                 }
 
+                .name-wrapper {
+                    display: flex;
+                }
+
+                .name-wrapper > .tags {
+                    margin: 0 0 0 4px;
+                }
+
                 .member-name {
                     font-weight: bold;
+                    flex: 1;
+                    width: 0;
                 }
 
                 .member-email {
@@ -46,7 +63,22 @@ export class MemberItem extends BaseElement {
             <pl-fingerprint .key=${this.member.publicKey}></pl-fingerprint>
 
             <div class="member-info">
-                <div class="member-name ellipsis">${this.member.name}</div>
+                <div class="name-wrapper">
+                    <div class="member-name ellipsis">${this.member.name}</div>
+                    ${!this.hideRole && isOwner
+                        ? html`
+                              <div class="small tags">
+                                  <div class="tag">${$l("Owner")}</div>
+                              </div>
+                          `
+                        : !this.hideRole && isAdmin
+                        ? html`
+                              <div class="small tags">
+                                  <div class="tag">${$l("Admin")}</div>
+                              </div>
+                          `
+                        : ""}
+                </div>
 
                 <div class="member-email ellipsis">${this.member.email}</div>
             </div>
