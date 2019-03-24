@@ -582,21 +582,22 @@ export class App extends EventEmitter {
                 await remoteVault.unlock(this.account);
             }
         } catch (e) {
-            if (e.code === ErrorCode.NOT_FOUND) {
-                if (localVault) {
-                    await this.storage.delete(localVault);
-                }
-                this._vaults.delete(id);
-                return null;
-            } else if (e.code === ErrorCode.MISSING_ACCESS) {
-                // User does not current have access to vault, this can happen
-                // if the vault has not been synchronized since the user has
-                // been added to it. We can safely ignore this.
-                console.log("Can't access remote vault");
-                return null;
-            } else {
-                throw e;
-            }
+            return null;
+            // if (e.code === ErrorCode.NOT_FOUND) {
+            //     if (localVault) {
+            //         await this.storage.delete(localVault);
+            //     }
+            //     this._vaults.delete(id);
+            //     return null;
+            // } else if (e.code === ErrorCode.MISSING_ACCESS) {
+            //     // User does not current have access to vault, this can happen
+            //     // if the vault has not been synchronized since the user has
+            //     // been added to it. We can safely ignore this.
+            //     console.log("Can't access remote vault");
+            //     return null;
+            // } else {
+            //     throw e;
+            // }
         }
 
         if (localVault) {

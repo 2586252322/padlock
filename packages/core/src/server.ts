@@ -21,7 +21,7 @@ import { Auth, EmailVerification } from "./auth";
 import { Request, Response } from "./transport";
 import { Err, ErrorCode } from "./error";
 import { Vault, VaultID } from "./vault";
-import { Org, OrgID } from "./org";
+import { Org, OrgID, OrgRole } from "./org";
 import { Invite } from "./invite";
 import { Messenger } from "./messenger";
 import { Server as SRPServer } from "./srp";
@@ -195,14 +195,26 @@ export class Context implements API {
 
     async updateAccount({ name, email, publicKey, keyParams, encryptionParams, encryptedData }: Account) {
         const { account } = this._requireAuth();
+
+        const nameChanged = account.name !== name;
+
         Object.assign(account, { name, email, publicKey, keyParams, encryptionParams, encryptedData });
         account.updated = new Date();
         await this.storage.save(account);
+
+        if (nameChanged) {
+            for (const orgId of account.orgs) {
+                const org = await this.storage.get(Org, orgId);
+                org.getMember(account)!.name = name;
+                await this.storage.save(org);
+            }
+        }
+
         return account;
     }
 
     async recoverAccount({
-        account: { name, email, publicKey, keyParams, encryptionParams, encryptedData },
+        account: { email, publicKey, keyParams, encryptionParams, encryptedData },
         auth,
         verify
     }: RecoverAccountParams) {
@@ -210,7 +222,7 @@ export class Context implements API {
 
         const existingAuth = await this.storage.get(Auth, auth.id);
         const account = await this.storage.get(Account, existingAuth.account);
-        Object.assign(account, { name, email, publicKey, keyParams, encryptionParams, encryptedData });
+        Object.assign(account, { email, publicKey, keyParams, encryptionParams, encryptedData });
 
         // reset main vault
         const mainVault = new Vault();
@@ -221,6 +233,14 @@ export class Context implements API {
         mainVault.updated = new Date();
 
         auth.account = account.id;
+
+        for (const orgId of account.orgs) {
+            const org = await this.storage.get(Org, orgId);
+            const member = org.getMember(account)!;
+            member.role = OrgRole.Suspended;
+            await this.storage.save(org);
+        }
+
         await Promise.all([this.storage.save(account), this.storage.save(auth), this.storage.save(mainVault)]);
 
         return account;

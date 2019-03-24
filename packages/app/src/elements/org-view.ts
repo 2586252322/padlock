@@ -145,6 +145,7 @@ export class OrgView extends View {
 
     render() {
         const org = this._org!;
+        const isOwner = org.isOwner(app.account!);
         const isAdmin = org.isAdmin(app.account!);
         const invites = org.invites;
         const groups = org.groups;
@@ -249,7 +250,7 @@ export class OrgView extends View {
                                     </li>
                                 `
                             )}
-                            <li class="centering padded tap" @click=${this._createInvite}>
+                            <li class="centering padded tap" @click=${this._createInvite} ?hidden=${!isOwner}>
                                 <pl-icon icon="invite"></pl-icon>
                                 <div>${$l("Invite New Member")}</div>
                             </li>
@@ -265,7 +266,7 @@ export class OrgView extends View {
                                     </li>
                                 `
                             )}
-                            <li class="centering padded tap" @click=${this._createGroup}>
+                            <li class="centering padded tap" @click=${this._createGroup} ?hidden=${!isOwner}>
                                 <pl-icon icon="add"></pl-icon>
                                 <div>${$l("New Group")}</div>
                             </li>
@@ -304,7 +305,7 @@ export class OrgView extends View {
                         </ul>
                     </div>
 
-                    <div class="fabs" ?hidden=${!isAdmin}>
+                    <div class="fabs" ?hidden=${!isOwner}>
                         <div class="flex"></div>
 
                         <pl-icon icon="invite" class="tap fab" @click=${() => this._createInvite()}></pl-icon>

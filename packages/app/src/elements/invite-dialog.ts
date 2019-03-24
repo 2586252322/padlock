@@ -126,10 +126,6 @@ export class InviteDialog extends Dialog<Invite, void> {
                     margin: 20px 0;
                 }
 
-                .tag {
-                    box-shadow: rgba(0, 0, 0, 0.2) 0 2px 2px;
-                }
-
                 .tag.org {
                     font-size: var(--font-size-small);
                     padding: 4px 16px;
