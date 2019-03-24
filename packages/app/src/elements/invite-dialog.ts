@@ -150,7 +150,7 @@ export class InviteDialog extends Dialog<Invite, void> {
             <div class="invite">
                 <pl-icon icon="cancel" class="tap close-button" @click=${() => this.done()}></pl-icon>
 
-                <h1>${purpose === "confirm_membership" ? $l("Confirm Membership") : $l("Org Invite")}</h1>
+                <h1>${purpose === "confirm_membership" ? $l("Confirm Membership") : $l("Organization Invite")}</h1>
 
                 <div class="tags">
                     <div class="tag org highlight">
@@ -191,8 +191,8 @@ export class InviteDialog extends Dialog<Invite, void> {
             <div class="invite-text">
                 ${$l(
                     purpose === "confirm_membership"
-                        ? "Please confirm your membership for the {0} org."
-                        : "You've been invited to join the {0} org.",
+                        ? "Please confirm your membership for the {0} organization."
+                        : "You've been invited to join the {0} organization.",
                     org!.name
                 )}
             </div>
@@ -213,7 +213,7 @@ export class InviteDialog extends Dialog<Invite, void> {
             <div class="invite-text small" ?hidden=${!_enableActions}>
                 ${$l(
                     "If you haven't received the confirmation code yet, please ask an " +
-                        "admin of the org to provide it to you!"
+                        "admin of the organization to provide it to you!"
                 )}
             </div>
         `;

@@ -1,8 +1,8 @@
 import { localize as $l } from "@padloc/core/lib/locale.js";
 import { Invite } from "@padloc/core/lib/invite.js";
-import { OrgMember, Group } from "@padloc/core/lib/org.js";
+import { OrgMember, OrgRole, Group } from "@padloc/core/lib/org.js";
 import { shared, mixins } from "../styles";
-import { dialog, prompt } from "../dialog.js";
+import { dialog, prompt, choose, confirm } from "../dialog.js";
 import { app, router } from "../init.js";
 import { element, html, property, query, observe } from "./base.js";
 import { View } from "./view.js";
@@ -96,8 +96,42 @@ export class OrgView extends View {
     }
 
     private async _showMember(member: OrgMember) {
-        await this._memberDialog.show({ org: this._org!, member });
-        this.requestUpdate();
+        const org = this._org!;
+
+        if (member.role === OrgRole.Suspended) {
+            const invite = org.invites.find(invite => invite.email === member.email);
+
+            if (invite) {
+                this._showInvite(invite);
+            } else {
+                const choice = await choose("", [$l("Remove Member"), $l("Unsuspend")], { type: "destructive" });
+
+                switch (choice) {
+                    case 0:
+                        const confirmed = await confirm(
+                            $l("Are you sure you want to remove this member from this organization?"),
+                            $l("Remove"),
+                            $l("Cancel"),
+                            {
+                                type: "destructive",
+                                title: $l("Remove Member")
+                            }
+                        );
+
+                        if (confirmed) {
+                            await app.removeMember(org, member);
+                        }
+                        break;
+                    case 1:
+                        const invite = await app.createInvite(org, member.email, "confirm_membership");
+                        router.go(`invite/${invite.org!.id}/${invite.id}`);
+                        break;
+                }
+            }
+        } else {
+            await this._memberDialog.show({ org: org, member });
+            this.requestUpdate();
+        }
     }
 
     @observe("orgId")
