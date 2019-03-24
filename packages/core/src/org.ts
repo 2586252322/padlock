@@ -310,10 +310,12 @@ export class Org extends SharedContainer implements Storable {
             throw "Organisation needs to be unlocked first.";
         }
 
+        role = typeof role !== "undefined" ? role : OrgRole.Member;
+
         const existing = this.members.find(m => m.id === id);
 
         if (existing) {
-            Object.assign(existing, { name, email, publicKey, role: role || OrgRole.Member });
+            Object.assign(existing, { name, email, publicKey, role });
             await this.sign(existing);
         } else {
             this.members.push(await this.sign(new OrgMember({ id, name, email, publicKey, role })));

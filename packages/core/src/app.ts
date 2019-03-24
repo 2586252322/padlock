@@ -401,7 +401,7 @@ export class App extends EventEmitter {
     async recoverAccount({ email, password, verify }: { email: string; password: string; verify: string }) {
         await this._logout();
 
-        const account = new Account();
+        let account = new Account();
         account.email = email;
         await account.initialize(password);
 
@@ -420,6 +420,35 @@ export class App extends EventEmitter {
                 verify
             })
         );
+
+        await this.login(email, password);
+
+        account = this.account!;
+
+        for (const org of this.orgs) {
+            if (org.isOwner(account)) {
+                await this.updateOrg(org.id, async org => {
+                    // Rotate org encryption key
+                    delete org.encryptedData;
+                    await org.updateAccessors([account]);
+
+                    // Rotate Org key pair
+                    await org.generateKeys();
+
+                    for (const member of org.members) {
+                        member.role = OrgRole.Suspended;
+                    }
+
+                    await org.addOrUpdateMember({
+                        id: account.id,
+                        email: account.email,
+                        name: account.name,
+                        publicKey: account.publicKey,
+                        role: OrgRole.Owner
+                    });
+                });
+            }
+        }
     }
 
     // VAULTS
