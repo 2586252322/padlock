@@ -230,7 +230,6 @@ export class Context implements API {
         const { account } = this._requireAuth();
 
         org.id = uuid();
-        org.owner = account.id;
 
         account.orgs.push(org.id);
 

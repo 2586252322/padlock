@@ -15,6 +15,7 @@ export class MemberItem extends BaseElement {
     render() {
         const isAdmin = this.member.role === OrgRole.Admin;
         const isOwner = this.member.role === OrgRole.Owner;
+        const isSuspended = this.member.role === OrgRole.Suspended;
 
         return html`
             ${shared}
@@ -75,6 +76,12 @@ export class MemberItem extends BaseElement {
                         ? html`
                               <div class="small tags">
                                   <div class="tag">${$l("Admin")}</div>
+                              </div>
+                          `
+                        : !this.hideRole && isSuspended
+                        ? html`
+                              <div class="small tags">
+                                  <div class="tag warning">${$l("Suspended")}</div>
                               </div>
                           `
                         : ""}

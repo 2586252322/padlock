@@ -168,7 +168,7 @@ export class MemberDialog extends Dialog<InputType, void> {
                 this._removeMember();
                 break;
             case 1:
-                this.open = true;
+                this._suspendMember();
                 break;
             case 2:
                 isAdmin ? this._removeAdmin() : this._makeAdmin();
@@ -212,9 +212,7 @@ export class MemberDialog extends Dialog<InputType, void> {
         const confirmed = await confirm(
             $l(
                 "Are you sure you want to make this member an admin? " +
-                    "Admins can add and remove members from the organization, " +
-                    "make other members admins " +
-                    "and create, edit and delete groups and vaults."
+                    "Admins can manage vaults, groups and permissions."
             ),
             $l("Make Admin"),
             $l("Cancel")
@@ -241,7 +239,8 @@ export class MemberDialog extends Dialog<InputType, void> {
         const confirmed = await confirm(
             $l("Are you sure you want to remove this member as admin?"),
             $l("Remove Admin"),
-            $l("Cancel")
+            $l("Cancel"),
+            { type: "destructive" }
         );
 
         this.open = true;
@@ -259,6 +258,32 @@ export class MemberDialog extends Dialog<InputType, void> {
         }
     }
 
+    private async _suspendMember() {
+        this.open = false;
+
+        const confirmed = await confirm(
+            $l("Are you sure you want to suspend this member?"),
+            $l("Suspend Member"),
+            $l("Cancel"),
+            { type: "destructive" }
+        );
+
+        this.open = true;
+
+        if (confirmed) {
+            this._saveButton.start();
+
+            try {
+                this.member = await app.updateMember(this.org!, this.member!, { role: OrgRole.Suspended });
+                this._saveButton.success();
+                this.done();
+            } catch (e) {
+                this._saveButton.fail();
+                throw e;
+            }
+        }
+    }
+
     shouldUpdate() {
         return !!this.org && !!this.member;
     }
@@ -266,6 +291,7 @@ export class MemberDialog extends Dialog<InputType, void> {
     renderContent() {
         const org = this.org!;
         const member = this.member!;
+        const accountIsOwner = org.isOwner(app.account!);
         const accountIsAdmin = org.isAdmin(app.account!);
         const memberIsOwner = org.isOwner(member);
 
@@ -319,7 +345,7 @@ export class MemberDialog extends Dialog<InputType, void> {
                 <pl-icon
                     icon="more"
                     class="more-button tap"
-                    ?hidden=${!accountIsAdmin || memberIsOwner}
+                    ?hidden=${!accountIsOwner || memberIsOwner}
                     @click=${this._showOptions}
                 ></pl-icon>
             </header>

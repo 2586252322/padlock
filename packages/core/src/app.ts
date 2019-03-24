@@ -560,6 +560,7 @@ export class App extends EventEmitter {
 
         return (
             member &&
+            member.role !== OrgRole.Suspended &&
             [member, ...org.getGroupsForMember(this.account!)].some(({ vaults }) =>
                 vaults.some(v => v.id === vault.id && !v.readonly)
             )
@@ -587,6 +588,12 @@ export class App extends EventEmitter {
                 }
                 this._vaults.delete(id);
                 return null;
+            } else if (e.code === ErrorCode.MISSING_ACCESS) {
+                // User does not current have access to vault, this can happen
+                // if the vault has not been synchronized since the user has
+                // been added to it. We can safely ignore this.
+                console.log("Can't access remote vault");
+                return null;
             } else {
                 throw e;
             }
@@ -601,29 +608,34 @@ export class App extends EventEmitter {
         }
 
         const org = result.org && this.getOrg(result.org.id);
-        if (org) {
-            const members = org.getMembersForVault(result);
-            await org.verifyAll(members);
-            await result.updateAccessors(members);
-        } else {
-            await result.updateAccessors([this.account]);
-        }
 
-        await result.commit();
-
-        if (transform) {
-            transform(result);
-        }
-
-        try {
-            await this.api.updateVault(result);
-        } catch (e) {
-            if (e.code === ErrorCode.MERGE_CONFLICT) {
-                // If there is a merge conflict (probably because somebody else
-                // did a push while we were sycing), start over.
-                return this._syncVault({ id });
+        // Don't push updates if vault belongs to an org and
+        // the accounts membership is currently suspended
+        if (!org || org.getMember(this.account)!.role !== OrgRole.Suspended) {
+            if (org) {
+                const members = org.getMembersForVault(result);
+                await org.verifyAll(members);
+                await result.updateAccessors(members);
+            } else {
+                await result.updateAccessors([this.account]);
             }
-            throw e;
+
+            await result.commit();
+
+            if (transform) {
+                transform(result);
+            }
+
+            try {
+                await this.api.updateVault(result);
+            } catch (e) {
+                if (e.code === ErrorCode.MERGE_CONFLICT) {
+                    // If there is a merge conflict (probably because somebody else
+                    // did a push while we were sycing), start over.
+                    return this._syncVault({ id });
+                }
+                throw e;
+            }
         }
 
         await this.saveVault(result);
@@ -783,7 +795,7 @@ export class App extends EventEmitter {
             groups?: string[];
             role?: OrgRole;
         }
-    ) {
+    ): Promise<OrgMember> {
         await this.updateOrg(org.id, async org => {
             const member = org.getMember({ id })!;
 
@@ -804,12 +816,10 @@ export class App extends EventEmitter {
 
             if (role) {
                 member.role = role;
-                await org.unlock(this.account!);
-                await org.updateAccessors(org.members.filter(m => m.role <= OrgRole.Admin));
             }
         });
 
-        return this.getOrg(org.id)!.getMember({ id });
+        return this.getOrg(org.id)!.getMember({ id })!;
     }
 
     async removeMember(org: Org, { id }: OrgMember) {

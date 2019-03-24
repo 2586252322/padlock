@@ -18,7 +18,8 @@ import { Invite, InviteID } from "./invite";
 export enum OrgRole {
     Owner,
     Admin,
-    Member
+    Member,
+    Suspended
 }
 
 export class OrgMember extends Serializable {
@@ -102,7 +103,6 @@ export type OrgID = string;
 export class Org extends SharedContainer implements Storable {
     id: OrgID = "";
     name: string = "";
-    owner: AccountID = "";
     publicKey!: RSAPublicKey;
     privateKey!: RSAPrivateKey;
     invitesKey!: Uint8Array;
@@ -124,7 +124,6 @@ export class Org extends SharedContainer implements Storable {
             super.validate() &&
             (typeof this.name === "string" &&
                 typeof this.id === "string" &&
-                typeof this.owner === "string" &&
                 this.publicKey instanceof Uint8Array &&
                 this.vaults.every(({ id, name }: any) => typeof id === "string" && typeof name === "string"))
         );
@@ -147,8 +146,9 @@ export class Org extends SharedContainer implements Storable {
         return super.fromRaw(rest);
     }
 
-    isOwner({ id }: { id: AccountID }) {
-        return id === this.owner;
+    isOwner(m: { id: AccountID }) {
+        const member = this.getMember(m);
+        return member && member.role <= OrgRole.Owner;
     }
 
     isAdmin(m: { id: AccountID }) {
@@ -184,7 +184,7 @@ export class Org extends SharedContainer implements Storable {
     }
 
     getMembersForVault({ id }: Vault): OrgMember[] {
-        return this.members.filter(member => member.vaults.some(v => v.id === id));
+        return this.members.filter(member => member.role !== OrgRole.Suspended && member.vaults.some(v => v.id === id));
     }
 
     getVaultsForMember(acc: OrgMember | Account) {
@@ -247,7 +247,7 @@ export class Org extends SharedContainer implements Storable {
 
         // Rotate org encryption key
         delete this.encryptedData;
-        await this.updateAccessors(this.members.filter(m => m.role <= OrgRole.Admin));
+        await this.updateAccessors(this.members.filter(m => m.role === OrgRole.Owner));
 
         // Resign groups and members
         await Promise.all(this.members.map(each => this.sign(each)));
@@ -288,7 +288,7 @@ export class Org extends SharedContainer implements Storable {
         }
     }
 
-    async verifyAll(subjects: OrgMember[] = this.members) {
+    async verifyAll(subjects: OrgMember[] = this.members.filter(m => m.role !== OrgRole.Suspended)) {
         // Verify public keys for members and groups
         await Promise.all(subjects.map(async obj => this.verify(obj)));
     }
@@ -319,8 +319,5 @@ export class Org extends SharedContainer implements Storable {
         } else {
             this.members[existing] = member;
         }
-
-        // Update access to keypair
-        await this.updateAccessors(this.members.filter(m => m.role <= OrgRole.Admin));
     }
 }
